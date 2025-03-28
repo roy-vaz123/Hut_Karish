@@ -1,11 +1,14 @@
-// basic kernel module headers
+// Basic kernel module
 #include <linux/module.h>
 #include <linux/kernel.h>
 #include <linux/init.h>
-// netwoeking headers
+// Netfilter hook
 #include <linux/netfilter.h> // Core netfilter definitions
 #include <linux/netfilter_ipv4.h>// Hook specificaly to ipv4 packets, since its the most common 
-#include <linux/ip.h>// Access ip header fields
+// Parse information from frame to get src dest ip port
+#include <linux/ip.h>
+#include <linux/tcp.h>
+#include <linux/udp.h>
 
 
 // Module information
@@ -28,19 +31,64 @@ static unsigned int packet_sniffer_hook(void *priv, struct sk_buff *skb, const s
     ip_header = ip_hdr(skb);
     if (!ip_header)// If failed to retrive ip header from packet (non ip packet or corrupted) using ip_hdr() macro
         return NF_ACCEPT;
+    
+    u8 protocol = ip_header->protocol;// Extract the protocol from the ip header
+    
+    // Usigned integers to store the source and destination ports after conversion from network byte order to host byte order 
+    u16 src_port = 0;
+    u16 dst_port = 0;
+            
+    // Check the protocol and handle accordingly
+    switch (protocol) {
+        
+        case IPPROTO_TCP:// handle TCP    
+            struct tcphdr *tcp_header;
+            tcp_header = tcp_hdr(skb);// Extract the TCP header from the packet using macro
+            
+            if (!tcp_header)
+                return NF_ACCEPT;
+            
+            // Extract source and destination ports from the TCP header, convert them to host byte order (u16) from network byte order
+            src_port = ntohs(tcp_header->source);
+            dst_port = ntohs(tcp_header->dest);
+            
+            printk(KERN_INFO "[sniffer] Caught a TCP packet: ");
+            break;
+        
+        
+        case IPPROTO_UDP:// handle UDP, same as tcp different macro
+            struct udphdr *udp_header;
+            
+            udp_header = udp_hdr(skb);// Extract the UDP header from the packet using macro
+            if (!udp_header)
+                return NF_ACCEPT;
+            
+            src_port = ntohs(udp_header->source);
+            dst_port = ntohs(udp_header->dest);
+
+            printk(KERN_INFO "[sniffer] Caught a UDP packet: ");
+            break;
+        
+        default:
+            // for other protocols do nothing for now
+            printk(KERN_INFO "[sniffer] Caught a packet (unknown protocol and ports): ");
+            break;
+    }
+
 
     // Print packets source and dest adresses (from ip header)
-    printk(KERN_INFO "[sniffer] Caught a packet: src=%pI4 dst=%pI4\n", &ip_header->saddr, &ip_header->daddr);
+    printk("src=%pI4:%d dst=%pI4:%d\n", &ip_header->saddr, src_port, &ip_header->daddr, dst_port);
 
     return NF_ACCEPT;  // Let the packet continue normally
 }
+
 
 // init function (runs on module load)
 static int __init sniffer_init(void) {
     printk(KERN_INFO "[sniffer] Module loaded.\n");
 
     nfho.hook = packet_sniffer_hook;       // The function to run when a packet hits the hook
-    nfho.hooknum = NF_INET_PRE_ROUTING;    // Places the hook right after the packet enters the system
+    nfho.hooknum = NF_INET_PRE_ROUTING;    // Places the hook right after the packet enters the system, wait for ipv4 packets
     nfho.pf = PF_INET;                     // IPv4 packets only
     nfho.priority = NF_IP_PRI_FIRST;       // Run before other hooks (highest priority)
 

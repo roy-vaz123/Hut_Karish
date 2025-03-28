@@ -1399,6 +1399,60 @@ deps_/home/roy/projects/packet-sniffer/sniffer.o := \
   /usr/src/linux-headers-6.1.0-32-common/include/uapi/linux/netfilter_ipv4.h \
   /usr/src/linux-headers-6.1.0-32-common/include/linux/ip.h \
   /usr/src/linux-headers-6.1.0-32-common/include/uapi/linux/ip.h \
+  /usr/src/linux-headers-6.1.0-32-common/include/linux/tcp.h \
+    $(wildcard include/config/BPF) \
+    $(wildcard include/config/TCP_MD5SIG) \
+  /usr/src/linux-headers-6.1.0-32-common/include/linux/win_minmax.h \
+  /usr/src/linux-headers-6.1.0-32-common/include/net/sock.h \
+    $(wildcard include/config/SOCK_RX_QUEUE_MAPPING) \
+    $(wildcard include/config/SOCK_VALIDATE_XMIT) \
+  /usr/src/linux-headers-6.1.0-32-common/include/linux/page_counter.h \
+  /usr/src/linux-headers-6.1.0-32-common/include/linux/memcontrol.h \
+  /usr/src/linux-headers-6.1.0-32-common/include/linux/vmpressure.h \
+  /usr/src/linux-headers-6.1.0-32-common/include/linux/eventfd.h \
+  /usr/src/linux-headers-6.1.0-32-common/include/linux/writeback.h \
+  /usr/src/linux-headers-6.1.0-32-common/include/linux/flex_proportions.h \
+  /usr/src/linux-headers-6.1.0-32-common/include/linux/backing-dev-defs.h \
+    $(wildcard include/config/DEBUG_FS) \
+  /usr/src/linux-headers-6.1.0-32-common/include/linux/blk_types.h \
+    $(wildcard include/config/FAIL_MAKE_REQUEST) \
+    $(wildcard include/config/BLK_CGROUP_IOCOST) \
+    $(wildcard include/config/BLK_INLINE_ENCRYPTION) \
+    $(wildcard include/config/BLK_DEV_INTEGRITY) \
+  /usr/src/linux-headers-6.1.0-32-common/include/linux/bio.h \
+  /usr/src/linux-headers-6.1.0-32-common/include/linux/mempool.h \
+  /usr/src/linux-headers-6.1.0-32-common/include/linux/rculist_nulls.h \
+  /usr/src/linux-headers-6.1.0-32-common/include/linux/poll.h \
+  /usr/src/linux-headers-6.1.0-32-common/include/uapi/linux/poll.h \
+  arch/x86/include/generated/uapi/asm/poll.h \
+  /usr/src/linux-headers-6.1.0-32-common/include/uapi/asm-generic/poll.h \
+  /usr/src/linux-headers-6.1.0-32-common/include/uapi/linux/eventpoll.h \
+  /usr/src/linux-headers-6.1.0-32-common/include/linux/indirect_call_wrapper.h \
+  /usr/src/linux-headers-6.1.0-32-common/include/net/dst.h \
+  /usr/src/linux-headers-6.1.0-32-common/include/linux/rtnetlink.h \
+    $(wildcard include/config/NET_INGRESS) \
+  /usr/src/linux-headers-6.1.0-32-common/include/uapi/linux/rtnetlink.h \
+  /usr/src/linux-headers-6.1.0-32-common/include/uapi/linux/if_addr.h \
+  /usr/src/linux-headers-6.1.0-32-common/include/net/neighbour.h \
+  /usr/src/linux-headers-6.1.0-32-common/include/net/rtnetlink.h \
+  /usr/src/linux-headers-6.1.0-32-common/include/net/netlink.h \
+  /usr/src/linux-headers-6.1.0-32-common/include/net/tcp_states.h \
+  /usr/src/linux-headers-6.1.0-32-common/include/uapi/linux/net_tstamp.h \
+  /usr/src/linux-headers-6.1.0-32-common/include/net/l3mdev.h \
+  /usr/src/linux-headers-6.1.0-32-common/include/net/fib_rules.h \
+  /usr/src/linux-headers-6.1.0-32-common/include/uapi/linux/fib_rules.h \
+  /usr/src/linux-headers-6.1.0-32-common/include/net/fib_notifier.h \
+  /usr/src/linux-headers-6.1.0-32-common/include/net/inet_connection_sock.h \
+  /usr/src/linux-headers-6.1.0-32-common/include/net/inet_sock.h \
+  /usr/src/linux-headers-6.1.0-32-common/include/linux/jhash.h \
+  /usr/src/linux-headers-6.1.0-32-common/include/linux/unaligned/packed_struct.h \
+  /usr/src/linux-headers-6.1.0-32-common/include/net/request_sock.h \
+  /usr/src/linux-headers-6.1.0-32-common/include/net/netns/hash.h \
+  /usr/src/linux-headers-6.1.0-32-common/include/net/inet_timewait_sock.h \
+  /usr/src/linux-headers-6.1.0-32-common/include/net/timewait_sock.h \
+  /usr/src/linux-headers-6.1.0-32-common/include/uapi/linux/tcp.h \
+  /usr/src/linux-headers-6.1.0-32-common/include/linux/udp.h \
+  /usr/src/linux-headers-6.1.0-32-common/include/uapi/linux/udp.h \
 
 /home/roy/projects/packet-sniffer/sniffer.o: $(deps_/home/roy/projects/packet-sniffer/sniffer.o)
 
