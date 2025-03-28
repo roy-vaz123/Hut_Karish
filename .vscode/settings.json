@@ -1,0 +1,9 @@
+{
+  "C_Cpp.default.configurationProvider": "ms-vscode.makefile-tools",
+  "makefile.makePath": "/usr/bin/make",
+  "editor.tabSize": 4,
+  "files.associations": {
+    "*.h": "c",
+    "linux/*.h": "c"
+  }
+}
