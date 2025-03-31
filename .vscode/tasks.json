@@ -1,57 +1,48 @@
 {
   "version": "2.0.0",
   "tasks": [
-    {
-      "label": "Build Kernel Module",
-      "type": "shell",
-      "command": "make",
-      "options": {
-        "cwd": "${workspaceFolder}/kernel_module"
+      {
+          "label": "Build Kernel Module",
+          "type": "shell",
+          "command": "make",
+          "options": {
+              "cwd": "${workspaceFolder}/kernel_module"
+          },
+          "group": "build",
+          "problemMatcher": []
       },
-      "group": "build",
-      "problemMatcher": []
-    },
-    {
-      "label": "Clean Kernel Module",
-      "type": "shell",
-      "command": "make clean",
-      "options": {
-        "cwd": "${workspaceFolder}/kernel_module"
+      {
+          "label": "Clean Kernel Module",
+          "type": "shell",
+          "command": "make clean",
+          "options": {
+              "cwd": "${workspaceFolder}/kernel_module"
+          },
+          "group": "build",
+          "problemMatcher": []
       },
-      "group": "build",
-      "problemMatcher": []
-    },
-    {
-      "label": "Build User App",
-      "type": "shell",
-      "command": "gcc",
-      "args": [
-        "-Wall",
-        "-o",
-        "app",
-        "${workspaceFolder}/app/main.c"
-      ],
-      "options": {
-        "cwd": "${workspaceFolder}/app"
+      {
+          "label": "Build User App (Makefile)",
+          "type": "shell",
+          "command": "make",
+          "options": {
+              "cwd": "${workspaceFolder}/app"
+          },
+          "group": "build",
+          "problemMatcher": []
       },
-      "group": {
-        "kind": "build",
-        "isDefault": true
-      },
-      "problemMatcher": []
-    },
-    {
-      "label": "Run User App",
-      "type": "shell",
-      "command": "./app",
-      "options": {
-        "cwd": "${workspaceFolder}/app"
-      },
-      "group": {
-        "kind": "test",
-        "isDefault": true
-      },
-      "problemMatcher": []
-    }
+      {
+          "label": "Run User App",
+          "type": "shell",
+          "command": "./app",
+          "options": {
+              "cwd": "${workspaceFolder}/app"
+          },
+          "group": {
+              "kind": "test",
+              "isDefault": true
+          },
+          "problemMatcher": []
+      }
   ]
 }

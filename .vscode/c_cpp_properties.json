@@ -18,15 +18,17 @@
         {
             "name": "User Space App",
             "includePath": [
-                "${workspaceFolder}/app/**",
+                "${workspaceFolder}/app/include",
+                "${workspaceFolder}/app/src",
                 "/usr/include",
                 "/usr/include/linux"
             ],
             "defines": [],
-            "compilerPath": "/usr/bin/gcc",
-            "cStandard": "gnu11",
+            "compilerPath": "/usr/bin/g++",
+            "cppStandard": "c++17",
             "intelliSenseMode": "linux-gcc-x64"
         }
+        
     ],
     "version": 4
 }
