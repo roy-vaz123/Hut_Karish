@@ -118,6 +118,12 @@ static void nl_recv_msg(struct sk_buff *skb)
     struct nlmsghdr *nlh;
     u32 pid;
     char *user_msg;
+    
+    // Check if the skb is NULL
+    if (!skb) {
+        pr_err("sniffer: Received NULL skb\n");
+        return;
+    }
 
     // Extract the Netlink message header
     nlh = (struct nlmsghdr *)skb->data;

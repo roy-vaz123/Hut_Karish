@@ -1,1 +1,1 @@
-/home/roy/projects/packet-sniffer/sniffer.o
+/home/roy/projects/hut_karish/kernel_module/sniffer.o

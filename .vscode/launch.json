@@ -1,0 +1,19 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+      {
+        "name": "Debug User App",
+        "type": "cppdbg",
+        "request": "launch",
+        "program": "${workspaceFolder}/app/app",
+        "args": [],
+        "stopAtEntry": true,
+        "cwd": "${workspaceFolder}/app",
+        "environment": [],
+        "externalConsole": false,
+        "MIMode": "gdb",
+        "preLaunchTask": "Build User App"
+      }
+    ]
+  }
+  
