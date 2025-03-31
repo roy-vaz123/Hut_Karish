@@ -12,14 +12,11 @@
 #include <linux/ip.h>
 #include <linux/tcp.h>
 #include <linux/udp.h>
-
-// For saving data in the kernel space
-#include <linux/spinlock.h>
-#include <linux/slab.h>  // needed for kmalloc and kfree
+// needed for kmalloc and kfree
+#include <linux/slab.h>  
 // Netlink socket
 #include <net/sock.h>
 #include <linux/netlink.h>
-
 // Project netlink config
 #include "../include/NetLinkConfig.h" 
 
@@ -34,77 +31,50 @@ MODULE_VERSION("0.1");
 
 static struct nf_hook_ops nfho;  // Netfilter hook options struct
 struct sock *nl_sk = NULL; // Netlink socket struct, used to send messages to user space
+static int subscribed = 0;
+static u32 user_pid = 0;
 
 
 
-static LIST_HEAD(pckt_list);// List head to store packet info
-static DEFINE_SPINLOCK(pckt_lock);// Spinlock to protect the list from concurrent access
 
-
-
-// Send a message to user space process by pid using netlink
-static void send_packet_list_to_user(u32 pid)
-{
-    struct pckt_info *entry, *tmp;
-    struct pckt_info *packet_buf;
-    struct sk_buff *skb_out;
+// Sends a single pckt_info struct to the user using Netlink
+static void send_packet_info_to_user(u32 pid, const struct pckt_info *msg) {
+    
+    struct sk_buff *nl_skb;
     struct nlmsghdr *nlh;
-    size_t count = 0, total_size, i = 0;
 
-    // Create a Netlink message buffer, spinlock to protect the list from concurrent access to make sure 
-    //the buffer is not modified while we are copying the packets
-    spin_lock(&pckt_lock);
-    // Count how many packets we have
-    list_for_each_entry(entry, &pckt_list, list)
-        count++;
-    if (count == 0)
-        return;  // No packets to send
-
-    total_size = count * sizeof(struct pckt_info);// Calculate the total size of the packet buffer
-    packet_buf = kmalloc(total_size, GFP_ATOMIC); // Allocate a temporary buffer to hold packet data
-    if (!packet_buf)
-        return;
-
-    // Copy all packets into the buffer and clear the list
-    list_for_each_entry_safe(entry, tmp, &pckt_list, list) {
-        packet_buf[i++] = *entry;  
-        list_del(&entry->list); // remove the entry from the list and free it    
-        kfree(entry);              
-    }
-    spin_unlock(&pckt_lock);// The packet_buf is now filled with the packets info
-
-
-    // Create a Netlink message buffer
-    skb_out = nlmsg_new(total_size, GFP_KERNEL);
-    if (!skb_out) {
-        pr_err("sniffer: Failed to allocate Netlink skb\n");
-        kfree(packet_buf);
+    // Allocate a new skb for the Netlink message
+    nl_skb = nlmsg_new(sizeof(*msg), GFP_ATOMIC);
+    if (!nl_skb) {
+        pr_info("[sniffer] Failed to allocate skb for Netlink message\n");
         return;
     }
-    nlh = nlmsg_put(skb_out, 0, 0, NLMSG_DONE, total_size, 0);
+
+    // Prepare the Netlink message header and payload
+    nlh = nlmsg_put(nl_skb, 0, 0, NLMSG_DONE, sizeof(*msg), 0);
     if (!nlh) {
-        pr_err("sniffer: nlmsg_put failed\n");
-        kfree_skb(skb_out);
-        kfree(packet_buf);
+        pr_info("[sniffer] Failed to create Netlink header\n");
+        kfree_skb(nl_skb);
         return;
     }
 
-    // Copy our packet buffer into the Netlink message
-    memcpy(nlmsg_data(nlh), packet_buf, total_size);
-    kfree(packet_buf);  // Free the kernel buffer after copying
+    // Copy the packet info into the message payload
+    memcpy(nlmsg_data(nlh), msg, sizeof(*msg));
 
-    // Send the message to user space
-    if (nlmsg_unicast(nl_sk, skb_out, pid) < 0) {
-        pr_err("sniffer: Failed to send Netlink message\n");
+    // Send the Netlink message to the user process
+    int res = netlink_unicast(nl_sk, nl_skb, pid, MSG_DONTWAIT);
+    if (res < 0) {
+        pr_info("[sniffer] Failed to send Netlink message, error: %d\n", res);
+        // nl_skb is freed automatically on error
     }
 }
 
 
-// Netlink Receive function (called when a message is received from user space)
+
+// Netlink Receive function (called when a message is received from user space) to subscribe/unsubscribe
 static void nl_recv_msg(struct sk_buff *skb)
 {
     struct nlmsghdr *nlh;
-    u32 pid;
     char *user_msg;
     
     // Check if the skb is NULL
@@ -116,20 +86,27 @@ static void nl_recv_msg(struct sk_buff *skb)
     // Extract the Netlink message header
     nlh = (struct nlmsghdr *)skb->data;
 
-    // Get the sender PID (user-space process ID)
-    pid = nlh->nlmsg_pid;
-
     // Extract the actual message data
     user_msg = (char *)nlmsg_data(nlh);
 
     pr_info("sniffer: received netlink message: %s\n", user_msg);
 
     // If the message is "get_packets", send the packet list to the user (to the sender proccess)
-    if (strcmp(user_msg, "get_packets") == 0) {
-        send_packet_list_to_user(pid);
-    } else {
-        pr_info("sniffer: Unknown command: %s\n", user_msg);
-    }
+    if (strcmp(user_msg, "subscribe") == 0) {
+        subscribed = 1;
+        user_pid = nlh->nlmsg_pid; // Get the PID of the sender process
+        pr_info("sniffer: Subscribed to packet notifications from PID: %u\n", user_pid);
+
+    } else if(strcmp(user_msg, "unsubscribe") == 0){
+            subscribed = 0;
+            user_pid = 0;
+            pr_info("sniffer: Unsubscribed from packet notifications\n");
+            return;
+            
+        }
+        else{
+            pr_info("sniffer: Unknown command: %s\n", user_msg);
+        }
 }
 
 
@@ -147,7 +124,7 @@ static unsigned int packet_sniffer_hook(void *priv, struct sk_buff *skb, const s
     u32 src_ip, dst_ip;
     u16 src_port, dst_port;
     char proto;
-    struct pckt_info *entry; // The entry to be added to the list
+    struct pckt_info *msg; // The message to send to user space
     
     // Check if the skb is NULL or too short (packets comes as sk_buff struct, skb = the packet)
     if (!skb || skb->len < sizeof(struct iphdr)) {
@@ -191,22 +168,26 @@ static unsigned int packet_sniffer_hook(void *priv, struct sk_buff *skb, const s
     // pr_info the packet info, for debugging
     pr_info("[sniffer] Packet type %c Src IP: %pI4, Dst IP: %pI4, Src Port: %u, Dst Port: %u, Payload: %u bytes \n", proto, &src_ip, &dst_ip, src_port, dst_port, payload_size);
  
-    entry = kmalloc(sizeof(*entry), GFP_ATOMIC);// Allocate memory for enrty in the list, GFP_ATOMIC prevents sleeping in the kernel space
-    if (!entry)// If kmalloc failed
-        return NF_ACCEPT;
+    // If the user is subscribed, send the packet's info to the user
+    if (subscribed && user_pid != 0) {           
+        pr_info("in");
+        msg = kmalloc(sizeof(*msg), GFP_ATOMIC);// Allocate memory for the packet info struct
+        if (!msg)
+            return NF_ACCEPT;
 
-    // Fill the entry with the packet info
-    entry->src_ip = src_ip;
-    entry->dst_ip = dst_ip;
-    entry->src_port = src_port;
-    entry->dst_port = dst_port;
-    entry->payload_size = payload_size;
-    entry->proto = proto;
+        // Fill the packet info struct with the packet's info
+        msg->src_ip = src_ip;
+        msg->dst_ip = dst_ip;
+        msg->src_port = src_port;
+        msg->dst_port = dst_port;
+        msg->payload_size = payload_size;
+        msg->proto = proto;
 
-    // Add the entry to the list with spinlock (to protect the list from concurrent access on usr get packets request)
-    spin_lock(&pckt_lock);
-    list_add_tail(&entry->list, &pckt_list);
-    spin_unlock(&pckt_lock);
+        // Send the packet info to the user process
+        send_packet_info_to_user(user_pid, msg);
+        kfree(msg);
+        pr_info("[sniffer] Packet info sent to user process PID: %u\n", user_pid);
+    }
 
 
 
@@ -244,19 +225,10 @@ static int __init sniffer_init(void) {
 
 // exit function (runs on module unload)
 static void __exit sniffer_exit(void) {
-    // Free the list and its entries
-    struct pckt_info *entry, *tmp;
-    
-    spin_lock(&pckt_lock);// Lock the list before iterating over it to prevent concurrent access
-    // Iterate over the list and free each entry
-    list_for_each_entry_safe(entry, tmp, &pckt_list, list) {
-        list_del(&entry->list);
-        kfree(entry);
-    }
-    spin_unlock(&pckt_lock);
-    
-    nf_unregister_net_hook(&init_net, &nfho); // Unregister the hook (if the hook is not unregistered, it will remain active even after the module is unloaded) 
-    
+   
+    // Unregister the hook (if the hook is not unregistered, it will remain active even after the module is unloaded) 
+    nf_unregister_net_hook(&init_net, &nfho); 
+
     // Unregister the Netlink socket
     if (nl_sk) {
         netlink_kernel_release(nl_sk);
