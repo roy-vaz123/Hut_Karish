@@ -1,11 +1,13 @@
 # app/Makefile
 
 CXX := g++
-CXXFLAGS := -Wall -Wextra -std=c++17 -g -Iinclude
-TARGET := main
+CXXFLAGS := -Wall -Wextra -std=c++17 -g -I../include -Iinclude
+TARGET := app
 
 SRC_DIR := src
 OBJ_DIR := obj
+INCLUDE_DIR := include
+
 SRCS := $(wildcard $(SRC_DIR)/*.cpp)
 OBJS := $(patsubst $(SRC_DIR)/%.cpp, $(OBJ_DIR)/%.o, $(SRCS))
 

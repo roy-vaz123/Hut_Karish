@@ -12,18 +12,17 @@
 #include <linux/ip.h>
 #include <linux/tcp.h>
 #include <linux/udp.h>
+
 // For saving data in the kernel space
-#include <linux/list.h>
 #include <linux/spinlock.h>
 #include <linux/slab.h>  // needed for kmalloc and kfree
 // Netlink socket
 #include <net/sock.h>
 #include <linux/netlink.h>
 
-// Netlink constants
-#define NETLINK_USER 31 // Netlink protocol number, 31 is in the range reserved for user-defined Netlink protocols
-#define USER_MSG     (NETLINK_USER + 1) // ?
-#define MAX_PAYLOAD  1024  // message size, max size of the payload in bytes
+// Project netlink config
+#include "../include/NetLinkConfig.h" 
+
 
 
 // Module information
@@ -36,17 +35,6 @@ MODULE_VERSION("0.1");
 static struct nf_hook_ops nfho;  // Netfilter hook options struct
 struct sock *nl_sk = NULL; // Netlink socket struct, used to send messages to user space
 
-
-// Packet info struct and list
-struct pckt_info {
-    u32 src_ip;
-    u32 dst_ip;
-    u16 src_port;
-    u16 dst_port;
-    u32 payload_size;
-    char proto; // 'T' for TCP, 'U' for UDP
-    struct list_head list;
-};
 
 
 static LIST_HEAD(pckt_list);// List head to store packet info
@@ -182,7 +170,7 @@ static unsigned int packet_sniffer_hook(void *priv, struct sk_buff *skb, const s
         tcph = tcp_hdr(skb);
         src_port = ntohs(tcph->source);
         dst_port = ntohs(tcph->dest);
-        proto = 'T';
+        proto = PROTO_TCP;
         payload_size = skb->len - skb_transport_offset(skb) - (tcph->doff * 4);  // skb_transport_offset(skb) to safely locate the start of TCP/UDP headers
     
     
@@ -190,7 +178,7 @@ static unsigned int packet_sniffer_hook(void *priv, struct sk_buff *skb, const s
         udph = udp_hdr(skb);
         src_port = ntohs(udph->source);
         dst_port = ntohs(udph->dest);
-        proto = 'U';
+        proto = PROTO_UDP;
         payload_size = skb->len - skb_transport_offset(skb) - sizeof(struct udphdr); 
     
     

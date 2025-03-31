@@ -21,6 +21,7 @@
                 "${workspaceFolder}/app/include",
                 "${workspaceFolder}/app/src",
                 "/usr/include",
+                "${workspaceFolder}/include",        
                 "/usr/include/linux"
             ],
             "defines": [],
@@ -31,4 +32,4 @@
         
     ],
     "version": 4
-}
+} 

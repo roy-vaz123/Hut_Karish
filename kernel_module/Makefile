@@ -7,6 +7,8 @@ obj-m += sniffer.o
 KDIR := /lib/modules/$(shell uname -r)/build
 PWD := $(shell pwd)
 
+ccflags-y += -I$(PROJECT_ROOT)/include
+
 # The following lines are used to compile the sniffer module
 # The $(MAKE) command is used to invoke the kernel build system
 # The -C option specifies the directory to change to before executing the make command
