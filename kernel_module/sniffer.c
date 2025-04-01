@@ -18,7 +18,7 @@
 #include <net/sock.h>
 #include <linux/netlink.h>
 // Project netlink config
-#include "../include/NetLinkConfig.h" 
+#include "../shared/config/NetLinkConfig.h" 
 
 
 

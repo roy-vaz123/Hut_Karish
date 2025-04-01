@@ -1,27 +1,21 @@
 # app/Makefile
 
-CXX := g++
-CXXFLAGS := -Wall -Wextra -std=c++17 -g -I../include -Iinclude -MMD
-TARGET := main
+CXX = g++
+CXXFLAGS = -Wall -std=c++17 -I../shared/netlink_client -I../shared/config -Iinclude
+LDFLAGS = ../build/lib/libshared.a
+TARGET = ../build/app/app
 
-SRC_DIR := src
-OBJ_DIR := obj
-INCLUDE_DIR := include
-
-SRCS := $(wildcard $(SRC_DIR)/*.cpp)
-OBJS := $(patsubst $(SRC_DIR)/%.cpp, $(OBJ_DIR)/%.o, $(SRCS))
-
-$(OBJ_DIR)/%.o: $(SRC_DIR)/%.cpp
-	mkdir -p $(OBJ_DIR)
-	$(CXX) $(CXXFLAGS) -c $< -o $@
+SRC = $(wildcard src/*.cpp)
+OBJ = $(SRC:.cpp=.o)
 
 all: $(TARGET)
 
-$(TARGET): $(OBJS)
-	$(CXX) $(CXXFLAGS) -o $@ $^
+$(TARGET): $(OBJ)
+	@mkdir -p ../build/app
+	$(CXX) $(CXXFLAGS) -o $@ $^ $(LDFLAGS)
+
+%.o: %.cpp
+	$(CXX) $(CXXFLAGS) -c $< -o $@
 
 clean:
-	rm -rf $(OBJ_DIR) $(TARGET)
-
-# Include generated dependency files
--include $(OBJS:.o=.d)
+	rm -f $(OBJ) $(TARGET)

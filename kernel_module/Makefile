@@ -1,20 +1,16 @@
-# Makefile for the sniffer module: make ko file instead of .o file
-# This Makefile is used to compile the sniffer module for Linux kernel
-# It is assumed that the kernel source is installed in /lib/modules/$(uname -r)/build
+# kernel_module/Makefile
 
-obj-m += sniffer.o
-
+obj-m := sniffer.o
 KDIR := /lib/modules/$(shell uname -r)/build
 PWD := $(shell pwd)
+OUT := ../build/kernel_module
 
-ccflags-y += -I$(PROJECT_ROOT)/include
-
-# The following lines are used to compile the sniffer module
-# The $(MAKE) command is used to invoke the kernel build system
-# The -C option specifies the directory to change to before executing the make command
-# The M option specifies the directory containing the module source files
 all:
+	@mkdir -p $(OUT)
 	$(MAKE) -C $(KDIR) M=$(PWD) modules
+# Copy kernel modules to build directory
+	@cp *.ko $(OUT) 
 
 clean:
 	$(MAKE) -C $(KDIR) M=$(PWD) clean
+	@rm -rf $(OUT)/*

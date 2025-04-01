@@ -1,35 +1,42 @@
 {
     "configurations": [
-        {
-            "name": "Linux Kernel Module",
-            "includePath": [
-                "${workspaceFolder}/**",
-                "/lib/modules/6.1.0-32-amd64/build/include",
-                "/lib/modules/6.1.0-32-amd64/build/arch/x86/include"
-            ],
-            "defines": [
-                "__KERNEL__",
-                "MODULE"
-            ],
-            "compilerPath": "/usr/bin/gcc",
-            "cStandard": "gnu11",
-            "intelliSenseMode": "linux-gcc-x64"
-        },
-        {
-            "name": "User Space App",
-            "includePath": [
-                "${workspaceFolder}/app/include",
-                "${workspaceFolder}/app/src",
-                "/usr/include",
-                "${workspaceFolder}/include",        
-                "/usr/include/linux"
-            ],
-            "defines": [],
-            "compilerPath": "/usr/bin/g++",
-            "cppStandard": "c++17",
-            "intelliSenseMode": "linux-gcc-x64"
-        }
-        
+      {
+        "name": "User Space",
+        "includePath": [
+          "${workspaceFolder}/app/include",
+          //"${workspaceFolder}/daemon/include",
+          "${workspaceFolder}/shared/netlink_client",
+          "${workspaceFolder}/shared/config",
+          "/usr/include",
+          "/usr/include/linux"
+        ],
+        "defines": [],
+        "compilerPath": "/usr/bin/g++",
+        "cStandard": "gnu11",
+        "cppStandard": "c++17",
+        "intelliSenseMode": "linux-gcc-x64"
+      },
+      {
+        "name": "Kernel Module",
+        "includePath": [
+          "${workspaceFolder}/kernel_module",
+          "/lib/modules/$(uname -r)/build/include",
+          "/lib/modules/$(uname -r)/build/arch/x86/include",
+          "/lib/modules/$(uname -r)/build/include/uapi",
+          "/lib/modules/$(uname -r)/build/arch/x86/include/uapi",
+          "/usr/include",
+          "/usr/include/linux"
+        ],
+        "defines": [
+          "__KERNEL__",
+          "MODULE"
+        ],
+        "compilerPath": "/usr/bin/gcc",
+        "cStandard": "gnu11",
+        "cppStandard": "c++17",
+        "intelliSenseMode": "linux-gcc-x64"
+      }
     ],
     "version": 4
-} 
+  }
+  

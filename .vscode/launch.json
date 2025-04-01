@@ -1,19 +1,31 @@
 {
-    "version": "0.2.0",
-    "configurations": [
-      {
-        "name": "Debug User App",
-        "type": "cppdbg",
-        "request": "launch",
-        "program": "${workspaceFolder}/app/app",
-        "args": [],
-        "stopAtEntry": true,
-        "cwd": "${workspaceFolder}/app",
-        "environment": [],
-        "externalConsole": false,
-        "MIMode": "gdb",
-        "preLaunchTask": "Build User App"
-      }
-    ]
-  }
-  
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Debug App",
+      "type": "cppdbg",
+      "request": "launch",
+      "program": "${workspaceFolder}/build/app/app",
+      "args": [],
+      "stopAtEntry": false,
+      "cwd": "${workspaceFolder}/app",
+      "environment": [],
+      "externalConsole": false,
+      "MIMode": "gdb",
+      "preLaunchTask": "Build App"
+    },
+    {
+      "name": "Debug Daemon",
+      "type": "cppdbg",
+      "request": "launch",
+      "program": "${workspaceFolder}/build/daemon/portmon_daemon",
+      "args": [],
+      "stopAtEntry": false,
+      "cwd": "${workspaceFolder}/daemon",
+      "environment": [],
+      "externalConsole": false,
+      "MIMode": "gdb",
+      "preLaunchTask": "Build Daemon"
+    }
+  ]
+}
