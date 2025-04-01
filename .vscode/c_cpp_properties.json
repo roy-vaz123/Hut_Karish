@@ -1,18 +1,35 @@
 {
-  "configurations": [
-    {
-      "name": "Linux Kernel Module",
-      "includePath": [
-        "${workspaceFolder}/**",
-        "/lib/modules/6.1.0-32-amd64/build/include",
-        "/lib/modules/6.1.0-32-amd64/build/arch/x86/include",
-        "/usr/include"
-      ],
-      "defines": ["__KERNEL__", "MODULE"],
-      "compilerPath": "/usr/bin/gcc",
-      "cStandard": "gnu11",
-      "intelliSenseMode": "linux-gcc-x64"
-    }
-  ],
-  "version": 4
-}
+    "configurations": [
+        {
+            "name": "Linux Kernel Module",
+            "includePath": [
+                "${workspaceFolder}/**",
+                "/lib/modules/6.1.0-32-amd64/build/include",
+                "/lib/modules/6.1.0-32-amd64/build/arch/x86/include"
+            ],
+            "defines": [
+                "__KERNEL__",
+                "MODULE"
+            ],
+            "compilerPath": "/usr/bin/gcc",
+            "cStandard": "gnu11",
+            "intelliSenseMode": "linux-gcc-x64"
+        },
+        {
+            "name": "User Space App",
+            "includePath": [
+                "${workspaceFolder}/app/include",
+                "${workspaceFolder}/app/src",
+                "/usr/include",
+                "${workspaceFolder}/include",        
+                "/usr/include/linux"
+            ],
+            "defines": [],
+            "compilerPath": "/usr/bin/g++",
+            "cppStandard": "c++17",
+            "intelliSenseMode": "linux-gcc-x64"
+        }
+        
+    ],
+    "version": 4
+} 

@@ -1,1 +1,0 @@
-cmd_/home/roy/projects/packet-sniffer/Module.symvers :=  sed 's/ko$$/o/'  /home/roy/projects/packet-sniffer/modules.order | scripts/mod/modpost -m      -o /home/roy/projects/packet-sniffer/Module.symvers -e -i Module.symvers -T - 
