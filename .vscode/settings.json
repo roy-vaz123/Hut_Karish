@@ -4,6 +4,7 @@
   "editor.tabSize": 4,
   "files.associations": {
     "*.h": "c",
-    "linux/*.h": "c"
+    "linux/*.h": "c",
+    "cstddef": "c"
   }
 }

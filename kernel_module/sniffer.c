@@ -137,8 +137,8 @@ static unsigned int packet_sniffer_hook(void *priv, struct sk_buff *skb, const s
         return NF_ACCEPT;
     
     // Get the source and destination IP addresses
-    src_ip = ntohl(iph->saddr); // Convert to host byte order
-    dst_ip = ntohl(iph->daddr);
+    src_ip = iph->saddr; // Convert to host byte order
+    dst_ip = iph->daddr;
 
 
 
@@ -170,14 +170,15 @@ static unsigned int packet_sniffer_hook(void *priv, struct sk_buff *skb, const s
  
     // If the user is subscribed, send the packet's info to the user
     if (subscribed && user_pid != 0) {           
-        pr_info("in");
         msg = kmalloc(sizeof(*msg), GFP_ATOMIC);// Allocate memory for the packet info struct
         if (!msg)
             return NF_ACCEPT;
 
         // Fill the packet info struct with the packet's info
+        // network byte order
         msg->src_ip = src_ip;
         msg->dst_ip = dst_ip;
+        // host byte order
         msg->src_port = src_port;
         msg->dst_port = dst_port;
         msg->payload_size = payload_size;

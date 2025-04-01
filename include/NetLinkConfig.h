@@ -14,9 +14,13 @@ typedef __u16 uint16_t;
 #endif
 
 // Packet info structure
+// IPs are in network byte order
+// Ports are in host byte order
 struct pckt_info {
+    // network byte order
     uint32_t src_ip;
     uint32_t dst_ip;
+    // host byte order
     uint16_t src_port;
     uint16_t dst_port;
     uint32_t payload_size;
