@@ -3,7 +3,7 @@
 CXX = g++
 CXXFLAGS = -Wall -std=c++17 \
     -Iinclude \
-    -I../shared/netlink_cleint \
+    -I../shared/netlink_client \
 	-I../shared/message_queue \
     -I../shared/config
 

@@ -106,8 +106,8 @@ namespace ScanFiles {
     }
 
     // Intialize the map of ports to PIDs by scanning the system files
-    PortPidMap initializeDB() {
-        PortPidMap map;
+    std::unordered_map<uint16_t, pid_t> initializePortPidMap() {
+        std::unordered_map<uint16_t, pid_t> map;
         std::string inode;
         uint16_t port;
         pid_t pid;

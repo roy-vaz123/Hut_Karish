@@ -11,16 +11,10 @@
 #include <netinet/in.h>
 
 std::atomic<bool> running = true;
-MessageQueue messageQueue;
+MessageQueue messageQueue;// queue to store messages from kernel module, waiting to be processed
 
-void recvThread(const NetLinkClient& client){
-    while (running) {
-        pckt_info* pkt = client.receiveMessage();
-        if (pkt) {
-            messageQueue.push(pkt);
-        }
-    }
-}
+// The thread that will listen and receive messages from the kernel module
+void recvThread(const NetLinkClient& client);
 
 int main() {
     
@@ -52,15 +46,6 @@ int main() {
         
         // Print packet info
         std::cout << "Received packet: src_ip: " << inet_ntoa(ip_addr) << ", proto: " << pkt->proto << "\n";
-        
-        // TODO: Replace with daemon-based PID lookup
-        pid_t fakePid = 1000 + (pkt->src_ip % 1000); // Dummy PID logic for now
-        packetMap[fakePid].push_back(pkt);
-
-        std::cout << "Stored packet for PID " << fakePid << ", proto: " << pkt->proto << "\n";
-
-        // Optional shutdown check
-        // if (someExitCondition) running = false;
     }
 
     // Stop receiver thread
@@ -76,9 +61,20 @@ int main() {
     // Free all stored packets
     for (auto& [pid, vec] : packetMap) {
         for (const pckt_info* pkt : vec) {
-            delete pkt;
+            client.freePacketInfo(pkt); // Free the allocated memory for the message
         }
     }
 
     return 0;
 }
+
+// The thread that will listen and receive messages from the kernel module
+void recvThread(const NetLinkClient& client){
+    while (running) {
+        const pckt_info* pkt = client.receivePacketInfo();
+        if (pkt) {
+            messageQueue.push(pkt);
+        }
+    }
+}
+

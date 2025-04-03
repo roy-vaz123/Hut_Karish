@@ -91,8 +91,8 @@ bool NetLinkClient::sendMessage(const std::string& msg) {
 }
 
 
-// Receives a reply from the kernel
-pckt_info* NetLinkClient::receiveMessage() const {
+// Receives a reply from the kernel, allocate memory
+const pckt_info* NetLinkClient::receivePacketInfo() const {
     char buffer[MAX_PAYLOAD];
     struct nlmsghdr* nlh = reinterpret_cast<struct nlmsghdr*>(buffer);
 
@@ -114,4 +114,9 @@ pckt_info* NetLinkClient::receiveMessage() const {
     pckt_info* pckt = new pckt_info;
     std::memcpy(pckt, NLMSG_DATA(nlh), sizeof(pckt_info));
     return pckt;
+}
+
+// Free the packet info structure
+void NetLinkClient::freePacketInfo(const pckt_info* pkt) const {
+    delete pkt;
 }
