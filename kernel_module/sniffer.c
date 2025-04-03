@@ -31,13 +31,17 @@ MODULE_VERSION("0.1");
 
 static struct nf_hook_ops nfho;  // Netfilter hook options struct
 struct sock *nl_sk = NULL; // Netlink socket struct, used to send messages to user space
-static int subscribed = 0;
-static u32 user_pid = 0;
+
+// Netlink clients subscribed to the kernel module, and thir PIDs
+static int app_subscribed = 0;
+static int deamon_subscribed = 0;
+static u32 app_pid = 0;
+static u32 deamon_pid = 0;
 
 
 
 
-// Sends a single pckt_info struct to the user using Netlink
+// Sends a single pckt_info struct to a client using Netlink
 static void send_packet_info_to_user(u32 pid, const struct pckt_info *msg) {
     
     struct sk_buff *nl_skb;
@@ -91,24 +95,55 @@ static void nl_recv_msg(struct sk_buff *skb)
 
     pr_info("sniffer: received netlink message: %s\n", user_msg);
 
-    // If the message is "get_packets", send the packet list to the user (to the sender proccess)
-    if (strcmp(user_msg, "subscribe") == 0) {
-        subscribed = 1;
-        user_pid = nlh->nlmsg_pid; // Get the PID of the sender process
-        pr_info("sniffer: Subscribed to packet notifications from PID: %u\n", user_pid);
+    // Subscribe/unsubscribe netlink cliets according to messages (to the sender proccess)
+    if (strcmp(user_msg, "app_subscribe") == 0) {
+        app_subscribed = 1;
+        app_pid = nlh->nlmsg_pid; // Get the PID of the sender process
+        pr_info("sniffer: app_subscribed to packet notifications from PID: %u\n", app_pid);
+        return;
 
-    } else if(strcmp(user_msg, "unsubscribe") == 0){
-            subscribed = 0;
-            user_pid = 0;
-            pr_info("sniffer: Unsubscribed from packet notifications\n");
-            return;
-            
-        }
-        else{
-            pr_info("sniffer: Unknown command: %s\n", user_msg);
-        }
+    }
+    if(strcmp(user_msg, "app_unsubscribe") == 0){
+        app_subscribed = 0;
+        app_pid = 0;
+        pr_info("sniffer: Unapp_subscribed from packet notifications\n");
+        return;   
+    }
+    if (strcmp(user_msg, "deamon_subscribe") == 0) {
+        deamon_subscribed = 1;
+        deamon_pid = nlh->nlmsg_pid; // Get the PID of the sender process
+        pr_info("sniffer: deamon_subscribed to packet notifications from PID: %u\n", deamon_pid);
+        return;
+
+    }
+    if(strcmp(user_msg, "deamon_unsubscribe") == 0){
+        deamon_subscribed = 0;
+        deamon_pid = 0;
+        pr_info("sniffer: Unsubscribed from packet notifications\n");
+        return;
+
+    }
+    pr_info("sniffer: Unknown command: %s\n", user_msg);
+    
 }
 
+static struct pckt_info* create_message( u32 src_ip, u32 dst_ip, u16 src_port, u16 dst_port, char proto) {
+    struct pckt_info *msg = kmalloc(sizeof(*msg), GFP_ATOMIC);
+    if (!msg) {
+        pr_err("sniffer: Failed to allocate memory for packet info\n");
+        return NULL;
+    }
+
+    // Fill the packet info struct with the packet's info
+    msg->src_ip = src_ip;
+    msg->dst_ip = dst_ip;
+    msg->src_port = src_port;
+    msg->dst_port = dst_port;
+    msg->proto = proto;
+
+    return msg;
+    
+}
 
 // Retrive ip header from a packet in the socket buffer and pr_info the packet cought
 static unsigned int packet_sniffer_hook(void *priv, struct sk_buff *skb, const struct nf_hook_state *state){
@@ -168,28 +203,30 @@ static unsigned int packet_sniffer_hook(void *priv, struct sk_buff *skb, const s
     // pr_info the packet info, for debugging
     pr_info("[sniffer] Packet type %c Src IP: %pI4, Dst IP: %pI4, Src Port: %u, Dst Port: %u, Payload: %u bytes \n", proto, &src_ip, &dst_ip, src_port, dst_port, payload_size);
  
-    // If the user is subscribed, send the packet's info to the user
-    if (subscribed && user_pid != 0) {           
-        msg = kmalloc(sizeof(*msg), GFP_ATOMIC);// Allocate memory for the packet info struct
+    // If the app is subscribed, create and send the packet's info to the app pid
+    if (app_subscribed && app_pid != 0) {           
+        msg = create_message(src_ip, dst_ip, src_port, dst_port, proto);
         if (!msg)
             return NF_ACCEPT;
-
-        // Fill the packet info struct with the packet's info
-        // network byte order
-        msg->src_ip = src_ip;
-        msg->dst_ip = dst_ip;
-        // host byte order
-        msg->src_port = src_port;
-        msg->dst_port = dst_port;
-        msg->payload_size = payload_size;
-        msg->proto = proto;
-
+        
         // Send the packet info to the user process
-        send_packet_info_to_user(user_pid, msg);
+        send_packet_info_to_user(app_pid, msg);
         kfree(msg);
-        pr_info("[sniffer] Packet info sent to user process PID: %u\n", user_pid);
+        pr_info("[sniffer] Packet info sent to user process PID: %u\n", app_pid);
     }
-
+    
+    // if the deamon is subscribed, create and send the packet's info to the deamon pid
+    else
+    if( deamon_subscribed && deamon_pid != 0) {           
+        msg = create_message(src_ip, dst_ip, src_port, dst_port, proto);
+        if (!msg)
+            return NF_ACCEPT;
+        
+        // Send the packet info to the user process
+        send_packet_info_to_user(deamon_pid, msg);
+        kfree(msg);
+        pr_info("[sniffer] Packet info sent to user process PID: %u\n", deamon_pid);
+    }
 
 
     return NF_ACCEPT;  // Let the packet continue normally

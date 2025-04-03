@@ -39,17 +39,17 @@ __used __section("__versions") = {
 	{ 0x5b8239ca, "__x86_return_thunk" },
 	{ 0x66e1119e, "nf_unregister_net_hook" },
 	{ 0x6ea2152, "netlink_kernel_release" },
-	{ 0x8d5931c0, "kmalloc_caches" },
-	{ 0xca078420, "kmalloc_trace" },
 	{ 0xdc324703, "__alloc_skb" },
-	{ 0x37a0cba, "kfree" },
 	{ 0x6de57620, "kfree_skb_reason" },
 	{ 0x461f148, "__nlmsg_put" },
 	{ 0x3d6af433, "netlink_unicast" },
+	{ 0x8d5931c0, "kmalloc_caches" },
+	{ 0xca078420, "kmalloc_trace" },
+	{ 0x37a0cba, "kfree" },
 	{ 0x82583a65, "module_layout" },
 };
 
 MODULE_INFO(depends, "");
 
 
-MODULE_INFO(srcversion, "D7D41AFBE3B2161054DA7B8");
+MODULE_INFO(srcversion, "E7775B34A4760C3E66CB1ED");

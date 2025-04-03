@@ -4,8 +4,9 @@
         "name": "User Space",
         "includePath": [
           "${workspaceFolder}/app/include",
-          //"${workspaceFolder}/daemon/include",
+          "${workspaceFolder}/daemon/include",
           "${workspaceFolder}/shared/netlink_client",
+          "${workspaceFolder}/shared/message_queue",
           "${workspaceFolder}/shared/config",
           "/usr/include",
           "/usr/include/linux"

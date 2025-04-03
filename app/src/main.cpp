@@ -28,7 +28,7 @@ int main() {
     std::unordered_map<pid_t, std::vector<const pckt_info*>> packetMap; // Map to store packets by PID
     
     // subscribe to kernel module messages
-    if (!client.sendMessage("subscribe")) {
+    if (!client.sendMessage("app_subscribe")) {
         std::cerr << "Failed to send message to kernel\n";
         return -1;
     }
@@ -68,7 +68,7 @@ int main() {
     listener.join();
 
     // Unsubscribe from kernel module messages
-    if (!client.sendMessage("unsubscribe")) {
+    if (!client.sendMessage("app_unsubscribe")) {
         std::cerr << "Failed to send message to kernel\n";
         return -1;
     }

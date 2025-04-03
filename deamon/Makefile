@@ -1,17 +1,22 @@
-# app/Makefile
+# daemon/Makefile
 
 CXX = g++
-CXXFLAGS = -Wall -std=c++17 -I../shared/netlink_client -I../shared/message_queue -I../shared/config -Iinclude
+CXXFLAGS = -Wall -std=c++17 \
+    -Iinclude \
+    -I../shared/netlink_cleint \
+	-I../shared/message_queue \
+    -I../shared/config
+
 LDFLAGS = ../build/lib/libshared.a
-TARGET = ../build/app/app
 
 SRC = $(wildcard src/*.cpp)
 OBJ = $(SRC:.cpp=.o)
+TARGET = ../build/daemon/portmon_daemon
 
 all: $(TARGET)
 
 $(TARGET): $(OBJ)
-	@mkdir -p ../build/app
+	@mkdir -p ../build/daemon
 	$(CXX) $(CXXFLAGS) -o $@ $^ $(LDFLAGS)
 
 %.o: %.cpp
