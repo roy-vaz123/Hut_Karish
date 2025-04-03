@@ -108,10 +108,10 @@ namespace ScanFiles {
         uint16_t port;
         pid_t pid;
         
-        // Get all TCP LISTEN sockets
+        // Get all TCP sockets
         sockInodePortVec tcpSockets = parseListeningSockets("/proc/net/tcp");
 
-        // Get all UDP bound sockets (UDP has no LISTEN state)
+        // Get all UDP sockets
         sockInodePortVec udpSockets = parseListeningSockets("/proc/net/udp");
 
         // For each TCP socket, find its owning PID and map it
@@ -126,7 +126,7 @@ namespace ScanFiles {
             }
         }
 
-        // For each UDP socket, find PID only if not already mapped by TCP
+        // For each UDP socket find PID only if not already mapped by TCP
         for (const auto& socket : udpSockets) {
             inode = socket.first;
             port = socket.second;

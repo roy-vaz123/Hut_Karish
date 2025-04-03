@@ -90,7 +90,6 @@ bool NetLinkClient::sendMessage(const std::string& msg) {
     return true;
 }
 
-
 // Receives a reply from the kernel, allocate memory
 const pckt_info* NetLinkClient::receivePacketInfo() const {
     char buffer[MAX_PAYLOAD];

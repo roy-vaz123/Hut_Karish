@@ -34,9 +34,9 @@ struct sock *nl_sk = NULL; // Netlink socket struct, used to send messages to us
 
 // Netlink clients subscribed to the kernel module, and thir PIDs
 static int app_subscribed = 0;
-static int deamon_subscribed = 0;
+static int daemon_subscribed = 0;
 static u32 app_pid = 0;
-static u32 deamon_pid = 0;
+static u32 daemon_pid = 0;
 
 
 
@@ -73,8 +73,6 @@ static void send_packet_info_to_user(u32 pid, const struct pckt_info *msg) {
     }
 }
 
-
-
 // Netlink Receive function (called when a message is received from user space) to subscribe/unsubscribe
 static void nl_recv_msg(struct sk_buff *skb)
 {
@@ -109,16 +107,16 @@ static void nl_recv_msg(struct sk_buff *skb)
         pr_info("sniffer: Unapp_subscribed from packet notifications\n");
         return;   
     }
-    if (strcmp(user_msg, "deamon_subscribe") == 0) {
-        deamon_subscribed = 1;
-        deamon_pid = nlh->nlmsg_pid; // Get the PID of the sender process
-        pr_info("sniffer: deamon_subscribed to packet notifications from PID: %u\n", deamon_pid);
+    if (strcmp(user_msg, "daemon_subscribe") == 0) {
+        daemon_subscribed = 1;
+        daemon_pid = nlh->nlmsg_pid; // Get the PID of the sender process
+        pr_info("sniffer: daemon_subscribed to packet notifications from PID: %u\n", daemon_pid);
         return;
 
     }
-    if(strcmp(user_msg, "deamon_unsubscribe") == 0){
-        deamon_subscribed = 0;
-        deamon_pid = 0;
+    if(strcmp(user_msg, "daemon_unsubscribe") == 0){
+        daemon_subscribed = 0;
+        daemon_pid = 0;
         pr_info("sniffer: Unsubscribed from packet notifications\n");
         return;
 
@@ -127,6 +125,7 @@ static void nl_recv_msg(struct sk_buff *skb)
     
 }
 
+// Creat pckt info struct to send based of data from hook
 static struct pckt_info* create_message( u32 src_ip, u32 dst_ip, u16 src_port, u16 dst_port, char proto) {
     struct pckt_info *msg = kmalloc(sizeof(*msg), GFP_ATOMIC);
     if (!msg) {
@@ -215,23 +214,22 @@ static unsigned int packet_sniffer_hook(void *priv, struct sk_buff *skb, const s
         pr_info("[sniffer] Packet info sent to user process PID: %u\n", app_pid);
     }
     
-    // if the deamon is subscribed, create and send the packet's info to the deamon pid
+    // if the daemon is subscribed, create and send the packet's info to the daemon pid
     else
-    if( deamon_subscribed && deamon_pid != 0) {           
+    if( daemon_subscribed && daemon_pid != 0) {           
         msg = create_message(src_ip, dst_ip, src_port, dst_port, proto);
         if (!msg)
             return NF_ACCEPT;
         
         // Send the packet info to the user process
-        send_packet_info_to_user(deamon_pid, msg);
+        send_packet_info_to_user(daemon_pid, msg);
         kfree(msg);
-        pr_info("[sniffer] Packet info sent to user process PID: %u\n", deamon_pid);
+        pr_info("[sniffer] Packet info sent to user process PID: %u\n", daemon_pid);
     }
 
 
     return NF_ACCEPT;  // Let the packet continue normally
 }
-
 
 // init function (runs on module load)
 static int __init sniffer_init(void) {

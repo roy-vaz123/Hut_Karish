@@ -5,6 +5,8 @@
   "files.associations": {
     "*.h": "c",
     "linux/*.h": "c",
-    "cstddef": "c"
+    "cstddef": "c",
+    "*.tcc": "cpp",
+    "fstream": "cpp"
   }
 }
