@@ -1,4 +1,4 @@
-#include "NetLinkClient.h" // Header file for NetlinkClient class
+#include "NetLinkClient.h" // Header file for NetLinkClient class
 #include <sys/socket.h> // socket, bind
 #include <cstring> // memset, strncpy
 #include <unistd.h> // getpid, close
@@ -7,7 +7,7 @@
 
 
 // Constructor create socket and bind to this process (src_addr)
-NetlinkClient::NetlinkClient() {
+NetLinkClient::NetLinkClient() {
     
     // Create a Netlink socket: nrtlink socket family, raw socket type, NETLINK_USER protocol
     sock_fd = socket(AF_NETLINK, SOCK_RAW, NETLINK_USER);
@@ -39,14 +39,14 @@ NetlinkClient::NetlinkClient() {
 }
 
 // Destructor only closes the socket
-NetlinkClient::~NetlinkClient() {
+NetLinkClient::~NetLinkClient() {
     if (sock_fd != -1) {
         close(sock_fd);
     }
 }
 
 // Sends a string message to the kernel
-bool NetlinkClient::sendMessage(const std::string& msg) {
+bool NetLinkClient::sendMessage(const std::string& msg) {
     if (sock_fd < 0) return false;// The socket is not created or bound
 
     std::cout << "Sending message to kernel: " << msg << std::endl;
@@ -91,37 +91,32 @@ bool NetlinkClient::sendMessage(const std::string& msg) {
 }
 
 
-// Receives a reply from the kernel
-bool NetlinkClient::receiveMessage() {
-    if (sock_fd < 0) return false; // Dont have a socket
+// Receives a reply from the kernel, allocate memory
+const pckt_info* NetLinkClient::receivePacketInfo() const {
+    char buffer[MAX_PAYLOAD];
+    struct nlmsghdr* nlh = reinterpret_cast<struct nlmsghdr*>(buffer);
 
-    // Allocate memory for the Netlink message (header + payload)
-    nlmsghdr* nlh = static_cast<nlmsghdr*>(malloc(NLMSG_SPACE(MAX_PAYLOAD)));
-    if (!nlh) return false;
-    memset(nlh, 0, NLMSG_SPACE(MAX_PAYLOAD));// Clear the structure memory before initilization
-
-    // The message is received in this format
-    iovec iov{};
-    iov.iov_base = reinterpret_cast<void*>(nlh);
-    iov.iov_len = NLMSG_SPACE(MAX_PAYLOAD);
-
-    // Initate empty message (will contain the received message)
-    msghdr msg{};
-    msg.msg_name = nullptr;
-    msg.msg_namelen = 0;
-    msg.msg_iov = &iov;
-    msg.msg_iovlen = 1;
-
-    // Receive the message from the kernel (blocking call)
-    ssize_t len = recvmsg(sock_fd, &msg, 0);
+    int len = recv(sock_fd, nlh, MAX_PAYLOAD, 0);
     if (len < 0) {
-        std::cerr << "Error: Failed to receive message from kernel\n";
-        free(nlh);
-        return false;
+        perror("recv");
+        return nullptr;
     }
 
-    // Print the received message (for now))
-    std::cout << "received" << std::endl;
-    free(nlh);
-    return true;
+    size_t payloadLen = nlh->nlmsg_len - NLMSG_HDRLEN;
+    if (payloadLen != sizeof(pckt_info)) {
+        std::cerr << "Unexpected payload size: " << payloadLen << std::endl;
+        return nullptr;
+    }
+
+    //   This copy is negligible for small packets like pckt_info.
+    //   For large or structured messages, ill need to consider queueing the full Netlink
+    //   buffer and parsing later in the main thread (to make sure this thread returns to listen quickly).  
+    pckt_info* pckt = new pckt_info;
+    std::memcpy(pckt, NLMSG_DATA(nlh), sizeof(pckt_info));
+    return pckt;
+}
+
+// Free the packet info structure
+void NetLinkClient::freePacketInfo(const pckt_info* pckt) const {
+    delete pckt;
 }
