@@ -16,7 +16,7 @@ public:
     // receive packets info from kernel (for now also interpret it, see explenation on the considerations
     // and alternative approach in the implementaion of this function)
     const pckt_info* receivePacketInfo() const;  
-    void freePacketInfo(const pckt_info* pkt) const; // free the packet info structure, the same allocator that allocated the memory (extra safety)
+    void freePacketInfo(const pckt_info* pckt) const; // free the packet info structure, the same allocator that allocated the memory (extra safety)
     
 
 private:

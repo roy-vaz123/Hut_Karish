@@ -16,7 +16,7 @@ namespace ScanFiles {
     // Full scan on startup
     std::unordered_map<uint16_t, pid_t> initializePortPidMap();
 
-    // Real-time scan for one port
-    pid_t scanForPidByPort(uint16_t port);
+    // Find port linked pid if its not already in the map
+    pid_t scanForPidByPort(uint16_t port, char packetProtocol);
 
 }

@@ -7,7 +7,7 @@
 // Thread safe queue for pckt_info* packtets, to hold them before find pid and insert to map 
 class MessageQueue {
 public:
-    void push(const pckt_info* pkt);         // Add packet to queue used in recv thread
+    void push(const pckt_info* pckt);         // Add packet to queue used in recv thread
     const pckt_info* pop();                  // Pop packet from queue used in main thread)
     bool empty();                      
 

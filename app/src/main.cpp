@@ -33,8 +33,8 @@ int main() {
     // Main loop: poll the queue for messages
     while (running) {
         
-        const pckt_info* pkt = messageQueue.pop();
-        if (!pkt) {
+        const pckt_info* pckt = messageQueue.pop();
+        if (!pckt) {
             // If queue is empty, wait a bit before checking again (avoid busy looping)
             std::this_thread::sleep_for(std::chrono::milliseconds(1));
             continue;
@@ -42,10 +42,10 @@ int main() {
         
         // Prepare for printing IP address
         struct in_addr ip_addr;
-        ip_addr.s_addr = pkt->src_ip;
+        ip_addr.s_addr = pckt->src_ip;
         
         // Print packet info
-        std::cout << "Received packet: src_ip: " << inet_ntoa(ip_addr) << ", proto: " << pkt->proto << "\n";
+        std::cout << "Received packet: src_ip: " << inet_ntoa(ip_addr) << ", proto: " << pckt->proto << "\n";
     }
 
     // Stop receiver thread
@@ -60,8 +60,8 @@ int main() {
     
     // Free all stored packets
     for (auto& [pid, vec] : packetMap) {
-        for (const pckt_info* pkt : vec) {
-            client.freePacketInfo(pkt); // Free the allocated memory for the message
+        for (const pckt_info* pckt : vec) {
+            client.freePacketInfo(pckt); // Free the allocated memory for the message
         }
     }
 
@@ -71,9 +71,9 @@ int main() {
 // The thread that will listen and receive messages from the kernel module
 void recvThread(const NetLinkClient& client){
     while (running) {
-        const pckt_info* pkt = client.receivePacketInfo();
-        if (pkt) {
-            messageQueue.push(pkt);
+        const pckt_info* pckt = client.receivePacketInfo();
+        if (pckt) {
+            messageQueue.push(pckt);
         }
     }
 }

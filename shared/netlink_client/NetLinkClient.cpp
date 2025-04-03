@@ -117,6 +117,6 @@ const pckt_info* NetLinkClient::receivePacketInfo() const {
 }
 
 // Free the packet info structure
-void NetLinkClient::freePacketInfo(const pckt_info* pkt) const {
-    delete pkt;
+void NetLinkClient::freePacketInfo(const pckt_info* pckt) const {
+    delete pckt;
 }

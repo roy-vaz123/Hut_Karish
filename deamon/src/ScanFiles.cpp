@@ -17,11 +17,8 @@ using sockInodePortVec = std::vector<std::pair<std::string, uint16_t>>;
 
 namespace ScanFiles {
 
-    // Parse /proc/net/tcp or /proc/net/udp and extract
-    // inode, port for sockets that are listening or bound.
-    // If getTCPState is true, only accept TCP LISTEN state, since they
-    // are the only relevant ones for our use case.
-    static sockInodePortVec parseListeningSockets(const std::string& path, bool TCPSocketState = true, uint16_t filterPort = 0) {
+    // Parse /proc/net/tcp or /proc/net/udp and extract, inode, port for sockets that are listening or bound.
+    static sockInodePortVec parseListeningSockets(const std::string& path, uint16_t filterPort = 0) {
         
         std::ifstream sockFile(path);// open the file as stream (divided by lines)
         
@@ -41,13 +38,12 @@ namespace ScanFiles {
                 portHex = match[1];
                 stateHex = match[2];
 
-                if (TCPSocketState && stateHex != "0A") continue; // For TCP, filter for LISTEN state only (0A)
-                
-
                 // Convert hex port string to uint16 (the format of the port sent from the kerne module)
                 // and check if it is the port we are looking for (or 0 for initialization)
                 uint16_t port = static_cast<uint16_t>(std::stoul(portHex, nullptr, 16));
-                if (filterPort != 0 && port != filterPort) continue;
+                if (filterPort != 0 && port != filterPort){
+                    continue;
+                } 
 
                 // Extract the inode of the socket from the line
                 std::istringstream iss(line);// Treat the line as a stream (seprate tokens by spaces)
@@ -113,10 +109,10 @@ namespace ScanFiles {
         pid_t pid;
         
         // Get all TCP LISTEN sockets
-        sockInodePortVec tcpSockets = parseListeningSockets("/proc/net/tcp", true);
+        sockInodePortVec tcpSockets = parseListeningSockets("/proc/net/tcp");
 
         // Get all UDP bound sockets (UDP has no LISTEN state)
-        sockInodePortVec udpSockets = parseListeningSockets("/proc/net/udp", false);
+        sockInodePortVec udpSockets = parseListeningSockets("/proc/net/udp");
 
         // For each TCP socket, find its owning PID and map it
         for (const auto& socket : tcpSockets) {
@@ -145,30 +141,37 @@ namespace ScanFiles {
         return map;
     }
 
-    // Real-time scan for a single port — used as a fallback when daemon receives a new port
-    pid_t scanForPidByPort(uint16_t port) {
+    // Find new port linked pid if its not already in the map
+    pid_t scanForPidByPort(uint16_t port, char packetProtocol) {
         // sockInodePortVec pair members
         std::string inode;
         pid_t pid;
         
-        // search port in TCP LISTEN sockets
-        sockInodePortVec tcpSockets = parseListeningSockets("/proc/net/tcp", true, port);
-        for (const auto& socket : tcpSockets) {
-            inode = socket.first;
-        
-            // Find the pid of the process using the socket inode, and update the map
-            pid = findPidBySockInode(inode);
-            return pid;
-        }
 
-        // search port in UDP sockets
-        sockInodePortVec udpSockets = parseListeningSockets("/proc/net/udp", false, port);
-        for (const auto& socket : udpSockets) {
-            inode = socket.first;
-        
-            // Find the pid of the process using the socket inode, and update the map
-            pid = findPidBySockInode(inode);
-            return pid;
+        if(packetProtocol == 'T'){
+            // search port in TCP LISTEN sockets
+            sockInodePortVec tcpSockets = parseListeningSockets("/proc/net/tcp", port);
+            for (const auto& socket : tcpSockets) {
+                inode = socket.first;
+
+                std::cout << "found tcp socket port " << socket.second << " for socket inode " << inode << std::endl;
+
+                // Find the pid of the process using the socket inode, and update the map
+                pid = findPidBySockInode(inode);
+                return pid;
+            }
+        }else{
+            // search port in UDP sockets
+            sockInodePortVec udpSockets = parseListeningSockets("/proc/net/udp", port);
+            for (const auto& socket : udpSockets) {
+                inode = socket.first;
+                
+                std::cout << "found udp socket port " << socket.second << " for socket inode " << inode << std::endl;
+
+                // Find the pid of the process using the socket inode, and update the map
+                pid = findPidBySockInode(inode);
+                return pid;
+            }
         }
 
         return -1; // not found
