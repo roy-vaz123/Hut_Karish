@@ -6,7 +6,7 @@
 
 // takes the path to the socket file as input
 UnixSocketServer::UnixSocketServer(const std::string& socketPath)
-    : socketPath(socketPath), serverFd(-1){}
+    : socketPath(socketPath), serverFd(-1){ start(); } // initialize the socket file path and server fd
 
 // clean up socket if still open
 UnixSocketServer::~UnixSocketServer() {
@@ -25,10 +25,10 @@ bool UnixSocketServer::start() {
     // Define the socket address
     sockaddr_un addr{};
     addr.sun_family = AF_UNIX;// set sockets adress family to unix
-    strncpy(addr.sun_path, socketPath_.c_str(), sizeof(addr.sun_path) - 1);// Copy the socket file location into the struct
+    strncpy(addr.sun_path, socketPath.c_str(), sizeof(addr.sun_path) - 1);// Copy the socket file location into the struct
 
     // Remove any existing file at the path (clean old sockets)
-    unlink(socketPath_.c_str());
+    unlink(socketPath.c_str());
 
     // Bind the socket to the file path
     if (bind(serverFd, (sockaddr*)&addr, sizeof(addr)) < 0) {

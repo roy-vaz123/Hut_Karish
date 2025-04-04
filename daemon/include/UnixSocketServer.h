@@ -3,7 +3,7 @@
 #include <unistd.h>// for socket functions 
 #include "UnixSocketConfig.h"  // Shared struct definition
 
-
+// thought about making this singleton, but my solution with shared pointers is easier to manage with multythreading
 class UnixSocketServer {
 public:
     // ctor takes the path to the socket file

@@ -3,7 +3,7 @@
 #include <sys/types.h>
 #include <unordered_map>
 #include <cstdint>
-
+#include <memory>// for shared vars (multiple threads)
 
 // Functions use to scan the system files, to find the PID of the process that is using a specific port
 // well do that by first, find the inode of the socket using that port and then find the PID of the process using that inode
