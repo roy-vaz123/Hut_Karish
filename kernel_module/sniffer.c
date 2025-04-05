@@ -202,6 +202,19 @@ static unsigned int packet_sniffer_hook(void *priv, struct sk_buff *skb, const s
     // pr_info the packet info, for debugging
     pr_info("[sniffer] Packet type %c Src IP: %pI4, Dst IP: %pI4, Src Port: %u, Dst Port: %u, Payload: %u bytes \n", proto, &src_ip, &dst_ip, src_port, dst_port, payload_size);
  
+    
+     // if the daemon is subscribed, create and send the packet's info to the daemon pid
+     if( daemon_subscribed && daemon_pid != 0) {           
+        msg = create_message(src_ip, dst_ip, src_port, dst_port, proto);
+        if (!msg)
+            return NF_ACCEPT;
+        
+        // Send the packet info to the user process
+        send_packet_info_to_user(daemon_pid, msg);
+        kfree(msg);
+        pr_info("[sniffer] Packet info sent to user process PID: %u\n", daemon_pid);
+    }
+    
     // If the app is subscribed, create and send the packet's info to the app pid
     if (app_subscribed && app_pid != 0) {           
         msg = create_message(src_ip, dst_ip, src_port, dst_port, proto);
@@ -214,19 +227,6 @@ static unsigned int packet_sniffer_hook(void *priv, struct sk_buff *skb, const s
         pr_info("[sniffer] Packet info sent to user process PID: %u\n", app_pid);
     }
     
-    // if the daemon is subscribed, create and send the packet's info to the daemon pid
-    else
-    if( daemon_subscribed && daemon_pid != 0) {           
-        msg = create_message(src_ip, dst_ip, src_port, dst_port, proto);
-        if (!msg)
-            return NF_ACCEPT;
-        
-        // Send the packet info to the user process
-        send_packet_info_to_user(daemon_pid, msg);
-        kfree(msg);
-        pr_info("[sniffer] Packet info sent to user process PID: %u\n", daemon_pid);
-    }
-
 
     return NF_ACCEPT;  // Let the packet continue normally
 }

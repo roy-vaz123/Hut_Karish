@@ -1,67 +1,75 @@
-#include "NetLinkClient.h"
-#include "MessageQueue.h" 
-#include <unordered_map> // Store packets by PID
-#include <thread> 
+#include "UserSpaceConfig.h"// for useful headers and shared pointers
+#include "UnixSocketClient.h"// for the client
+#include "PidToPacketsInfoMap.h"// for the map
 #include <vector>
-#include <atomic> // To share bool between threads
-#include <iostream>
-#include <chrono>
 // To print ip address
 #include <arpa/inet.h>
 #include <netinet/in.h>
+#include <iostream>
 
-std::atomic<bool> running = true;
-MessageQueue messageQueue;// queue to store messages from kernel module, waiting to be processed
+using UnixSocketClientPtr = std::shared_ptr<const UnixSocketClient>;
+using PidToPacketsMapPtr = std::shared_ptr<PidToPacketsInfoMap>;
 
 // The thread that will listen and receive messages from the kernel module
-void recvThread(const NetLinkClient& client);
+void recvThread(NetLinkClientRecievePtr client, MessageQueuePtr messageQueue);
 
 int main() {
     
-    NetLinkClient client;// Create Netlink client
-    std::unordered_map<pid_t, std::vector<const pckt_info*>> packetMap; // Map to store packets by PID
+    NetLinkClientPtr netLinkClient = std::make_shared<NetLinkClient>();// Create Netlink client
+    MessageQueuePtr messageQueue = std::make_shared<MessageQueue>();// Create the message queue
+    PidToPacketsMapPtr pidToPacketsMap = std::make_shared<PidToPacketsInfoMap>(); // Map to store packets by PID
+    UnixSocketClientPtr unixClient = std::make_shared<UnixSocketClient>(); // Create Unix socket client
+    pid_t pid; // Get the pid of the current packet
     
     // subscribe to kernel module messages
-    if (!client.sendMessage("app_subscribe")) {
+    if (!netLinkClient->sendMessage("app_subscribe")) {
         std::cerr << "Failed to send message to kernel\n";
         return -1;
     }
     
     // Start the receiver thread
-    std::thread listener(recvThread, std::cref(client));
+    std::thread listener(recvThread, NetLinkClientRecievePtr(netLinkClient), messageQueue);
 
     // Main loop: poll the queue for messages
-    while (running) {
+    while (true) {
         
-        const pckt_info* pckt = messageQueue.pop();
+        const pckt_info* pckt = messageQueue->pop();
         if (!pckt) {
             // If queue is empty, wait a bit before checking again (avoid busy looping)
             std::this_thread::sleep_for(std::chrono::milliseconds(1));
             continue;
         }
+        if(pidToPacketsMap->containsPacket(pckt)) continue;// Check if the packet already exists in the map, if so, skip it
         
+        //find packets dest pid and insert to map
+        if(!unixClient->sendPort(pckt->dst_port)) break; // Send the packets port to the deamon
+        if(!unixClient->receivePid(pid)) break; // Receive the pid from the deamon
         // Prepare for printing IP address
         struct in_addr ip_addr;
         ip_addr.s_addr = pckt->src_ip;
         
         // Print packet info
-        std::cout << "Received packet: src_ip: " << inet_ntoa(ip_addr) << ", proto: " << pckt->proto << "\n";
+        if(pid != -1) {
+            std::cout << "Received packet: Pid "<< pid << " src_ip: " << inet_ntoa(ip_addr) << ", proto: " << pckt->proto << "\n";
+        } else {
+            std::cout << "Received packet: Pid unknown src_ip: " << inet_ntoa(ip_addr) << ", proto: " << pckt->proto << "\n";
+        }
+        pidToPacketsMap->insertPacketInfo(pid, pckt); // Insert the packet into the map    
     }
 
     // Stop receiver thread
-    running = false;
     listener.join();
 
     // Unsubscribe from kernel module messages
-    if (!client.sendMessage("app_unsubscribe")) {
+    if (!netLinkClient->sendMessage("app_unsubscribe")) {
         std::cerr << "Failed to send message to kernel\n";
         return -1;
     }
     
     // Free all stored packets
-    for (auto& [pid, vec] : packetMap) {
-        for (const pckt_info* pckt : vec) {
-            client.freePacketInfo(pckt); // Free the allocated memory for the message
+    for (const auto& pair : pidToPacketsMap->getMap()) {
+        for (const pckt_info* pckt : pair.second) {
+            netLinkClient->freePacketInfo(pckt); // Free the allocated memory for the message
         }
     }
 
@@ -69,11 +77,11 @@ int main() {
 }
 
 // The thread that will listen and receive messages from the kernel module
-void recvThread(const NetLinkClient& client){
-    while (running) {
-        const pckt_info* pckt = client.receivePacketInfo();
+void recvThread(NetLinkClientRecievePtr client, MessageQueuePtr messageQueue) {
+    while (true) {
+        const pckt_info* pckt = client->receivePacketInfo();
         if (pckt) {
-            messageQueue.push(pckt);
+            messageQueue->push(pckt);
         }
     }
 }

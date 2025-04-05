@@ -1,54 +1,51 @@
-#include "PortToPidMap.h"
-#include "NetLinkClient.h"
-#include "MessageQueue.h"
+
+#include "AppThreadsMap.h"// for the connected apps threads
+#include "ScanFiles.h"// for scanning the files for the pids
+#include "UserSpaceConfig.h"// for useful headers and shared ptrs
 #include "UnixSocketServer.h" 
-#include <thread> 
-#include <vector>
-#include <atomic> // To share bool between threads
-#include <iostream>
-#include <chrono>
-// To print ip address
-#include <arpa/inet.h>
-#include <netinet/in.h>
+#include <unistd.h> // files functions (close, unlink, read, write)
+#include <sys/socket.h> // for socket functions like accept
 #include <syslog.h>// for log (no cout for daemons)
+#include <iostream>
 
 
 // Shared pointers to share data through threads, safe to use end easier to manage the global vars
-using PortToPidMapReadPtr = std::shared_ptr<PortToPidMap>;
-using PortToPidMapPtr = std::shared_ptr<PortToPidMap>;
-using ManageQueuePtr = std::shared_ptr<MessageQueue>;
-using NetLinkClientPtr = std::shared_ptr<NetLinkClient>;// not const because send messages not const
-using NetLinkClientRecievePtr = std::shared_ptr<const NetLinkClient>;
+using PortToPidMapReadPtr = std::shared_ptr<const ThreadSafeUnorderedMap<uint16_t, pid_t>>;// for the port to pid map
+using PortToPidMapPtr = std::shared_ptr<ThreadSafeUnorderedMap<uint16_t, pid_t>>;// for the port to pid map
 using UnixSocketServerPtr = std::shared_ptr<const UnixSocketServer>;
-using connectedAppsMutexPtr = std::shared_ptr<std::mutex>;
-using ConnectedAppsMapPtr = std::shared_ptr<std::unordered_map<int, std::thread>>;// note: I could have combined this with porttopid class to thread safe template unordered map, but this is simpler and that does class contain some logic
-
-std::atomic<bool> running = true;
+using ConnectedAppsMapPtr = std::shared_ptr<AppThreadsMap>;// for the connected apps threads
 
 // Runs on a seperate thread, insert new clients connecting to the connectedApps map
-void acceptAppConnectionThread(UnixSocketServerPtr appsCommServer, PortToPidMapReadPtr portPidMap, connectedAppsMutexPtr connectedAppsMutex, ConnectedAppsMapPtr connectedApps);
+void acceptAppConnectionThread(UnixSocketServerPtr appsCommServer, PortToPidMapReadPtr portPidMap, ConnectedAppsMapPtr connectedApps);
 
 // The thread for connected app, wait for messages containing ports and returns pid from the port pid map 
-void appConnectionThread(int clientFd, UnixSocketServerPtr appsCommServer, PortToPidMapReadPtr portPidMap, connectedAppsMutexPtr connectedAppsMutex, ConnectedAppsMapPtr connectedApps);
+void appConnectionThread(int clientFd, UnixSocketServerPtr appsCommServer, PortToPidMapReadPtr portPidMap, ConnectedAppsMapPtr connectedApps);
 
 // The thread thall listen and receive messages from the kernel module
-void recvPacketInfoThread(NetLinkClientRecievePtr client, ManageQueuePtr messageQueue);
+void recvPacketInfoThread(NetLinkClientRecievePtr client, MessageQueuePtr messageQueue);
+
+// Return pid of port from map or -1 if not found
+pid_t getPidByPort(uint16_t port, PortToPidMapReadPtr portPidMap);
+
+// Update the port pid map with the new pid, return false if falis to find pid in files
+bool updatePortPidMap(uint16_t port, PortToPidMapPtr portPidMap, char packetProtocol);
 
 int main() {
     
     // Using syslog for logging, using log_daemon format, writes to /var/log/syslog app name portmon_daemon, print error to conlose
     openlog("portmon_daemon", LOG_PID | LOG_CONS, LOG_DAEMON);
     
+    // Initilize the global variables
     NetLinkClientPtr client = std::make_shared<NetLinkClient>();// Create Netlink client
-    PortToPidMapPtr portPidMap = std::make_shared<PortToPidMap>(); // Initialize the database of ports and PIDs
+    PortToPidMapPtr portPidMap = std::make_shared<ThreadSafeUnorderedMap<uint16_t, pid_t>>(); // Initialize the database of ports and PIDs
+    ScanFiles::initializePortPidMap(*portPidMap);// Scan the system files to find the PIDs of the processes using the ports
     UnixSocketServerPtr appsCommServer = std::make_shared<UnixSocketServer>(SOCKET_FILE_ADRESS);// Create the Unix socket server to bind with sock file adress
-    ManageQueuePtr messageQueue = std::make_shared<MessageQueue>();// Create the message queue
-    ConnectedAppsMapPtr connectedApps = std::make_shared<std::unordered_map<int, std::thread>>();// Map of connected apps and their threads
+    MessageQueuePtr messageQueue = std::make_shared<MessageQueue>();// Create the message queue
+    ConnectedAppsMapPtr connectedApps = std::make_shared<AppThreadsMap>();// Map of connected apps and their threads
     
-    connectedAppsMutexPtr connectedAppsMutex = std::make_shared<std::mutex>();// For thread safe access to connected apps map
     
     // start the thread that listen to new apps and connect them to daemon
-    std::thread appClientConnectionListener(acceptAppConnectionThread, appsCommServer, portPidMap, connectedAppsMutex, connectedApps);
+    std::thread appClientConnectionListener(acceptAppConnectionThread, appsCommServer, portPidMap, connectedApps);
 
     for(const auto& pair : portPidMap->getMap()){// logging
         std::cout << "port " << pair.first << " pid "<< pair.second << std::endl;
@@ -64,7 +61,7 @@ int main() {
     std::thread packetInfoListener(recvPacketInfoThread, NetLinkClientRecievePtr(client), messageQueue);
 
     // Main loop: poll the queue for messages
-    while (running) {
+    while (true) {
         const pckt_info* pckt = messageQueue->pop();
         if (!pckt) {
             // If queue is empty, wait a bit before checking again (avoid busy looping)
@@ -72,10 +69,10 @@ int main() {
             continue;
         }
         // A packet was received, update port-PID map if necceccary
-        if(portPidMap->getPid(pckt->dst_port) == -1) {
-            if(portPidMap->addMapping(pckt->dst_port, pckt->proto)){// find the pid of the process using the port
+        if(getPidByPort(pckt->dst_port, portPidMap) == -1) {
+            if(updatePortPidMap(pckt->dst_port, portPidMap, pckt->proto)){// find the pid of the process using the port
                
-                std::cout << "Port: " << pckt->dst_port << ", PID: " << portPidMap->getPid(pckt->dst_port) << " added to map"<< std::endl;// switch to log
+                std::cout << "Port: " << pckt->dst_port << ", PID: " << *(portPidMap->get(pckt->dst_port)) << " added to map"<< std::endl;// logging
             }
         }
         // Free the packet info structure
@@ -83,7 +80,6 @@ int main() {
     }
 
     // Stop receiver thread
-    running = false;
     packetInfoListener.join();
 
     // Unsubscribe from kernel module messages
@@ -101,17 +97,15 @@ int main() {
     }
 
     // Join all connected app threads for clean clousure
-    for(auto& appConnection : *connectedApps) {
-        if(appConnection.second.joinable()) appConnection.second.join();
-    }
+    connectedApps->joinAll();
     appClientConnectionListener.join();// join the app connection listener thread
     
     return 0;
 }
 
 // The thread thall listen and receive messages from the kernel module
-void recvPacketInfoThread(NetLinkClientRecievePtr client, ManageQueuePtr messageQueue) {
-    while (running) {
+void recvPacketInfoThread(NetLinkClientRecievePtr client, MessageQueuePtr messageQueue) {
+    while (true) {
         const pckt_info* pckt = client->receivePacketInfo();// allocate memory for the packet!!!!!
         if (pckt) {
             messageQueue->push(pckt);
@@ -120,31 +114,33 @@ void recvPacketInfoThread(NetLinkClientRecievePtr client, ManageQueuePtr message
 }
 
 // The thread for connected app, wait for messages containing ports and returns pid from the port pid map 
-void appConnectionThread(int clientFd, UnixSocketServerPtr appsCommServer, PortToPidMapReadPtr portPidMap, connectedAppsMutexPtr connectedAppsMutex, ConnectedAppsMapPtr connectedApps) {
+void appConnectionThread(int clientFd, UnixSocketServerPtr appsCommServer, PortToPidMapReadPtr portPidMap, ConnectedAppsMapPtr connectedApps) {
     uint16_t port;
-    pid_t pid;
+    const pid_t* pid;
     while (true) {
         if(!appsCommServer->receivePort(clientFd, port)) break;// blocking, waiting to recieve message from client
         
-        // Get the ports pid or -1 if unknown and send to client
-        pid = portPidMap->getPid(port);
-        appsCommServer->sendPid(clientFd, pid);
+        // Get the ports pid or nullptr if unknown and send to client
+        pid = portPidMap->get(port);
+        if(pid) {// send and logging
+            std::cout << "Client (fd=" << clientFd << ") requested port " << port << ", PID: " << *pid << "\n";// logging
+            appsCommServer->sendPid(clientFd, *pid);
+        } else {
+            std::cout << "Client (fd=" << clientFd << ") requested port " << port << ", PID: unknown\n";// logging
+            appsCommServer->sendPid(clientFd, -1);// send -1 to client
+        }
+        
     }
 
     close(clientFd);
 
     // Remove the app from the connectedApps map
-    std::lock_guard<std::mutex> lock(*connectedAppsMutex);
-    if(connectedApps->find(clientFd) != connectedApps->end()) {
-        connectedApps->erase(clientFd);// the app disconnected, remove it from the map
-        std::cout << "Client disconnected (fd=" << clientFd << ")\n";// logging
-    }
-    
-}// the lock releases automatically
-
+    connectedApps->erase(clientFd);// the app disconnected, remove it from the map
+    std::cout << "Client disconnected (fd=" << clientFd << ")\n";// logging
+}
 
 // Runs on a seperate thread, insert new clients connecting to the connectedApps map
-void acceptAppConnectionThread(UnixSocketServerPtr appsCommServer, PortToPidMapReadPtr portPidMap, connectedAppsMutexPtr connectedAppsMutex, ConnectedAppsMapPtr connectedApps) {
+void acceptAppConnectionThread(UnixSocketServerPtr appsCommServer, PortToPidMapReadPtr portPidMap, ConnectedAppsMapPtr connectedApps) {
     int serverFd = appsCommServer->getServerFd();
     while (true) {
         int clientFd = accept(serverFd, nullptr, nullptr);// blocking waiting for new apps to connect to daemon
@@ -154,9 +150,29 @@ void acceptAppConnectionThread(UnixSocketServerPtr appsCommServer, PortToPidMapR
         }
 
         std::cout << "Client connected (fd=" << clientFd << ")\n";// logging
-
-        std::lock_guard<std::mutex> lock(*connectedAppsMutex);
-        (*connectedApps)[clientFd] = std::thread(appConnectionThread, clientFd, appsCommServer, portPidMap, connectedAppsMutex, connectedApps);// create a new thread for the connected app
-    }// the lock releases automatically
+        // create a new thread for the connected app
+        connectedApps->insertAppThread(clientFd, std::thread(appConnectionThread, clientFd, appsCommServer, portPidMap, connectedApps));
+    }
 }
 
+// Return pid of port from map or -1 if not found
+pid_t getPidByPort(uint16_t port, PortToPidMapReadPtr portPidMap){
+    const pid_t* pid = portPidMap->get(port);
+    if (pid) {
+        return *pid;
+    }
+    return -1; // not found
+}
+
+// Update the port pid map with the new pid, return false if falis to find pid in files
+bool updatePortPidMap(uint16_t port, PortToPidMapPtr portPidMap, char packetProtocol) {
+    pid_t pid = ScanFiles::scanForPidByPort(port, packetProtocol);// find the pid of the process using the port
+    if(pid == -1) {
+        std::cerr << "Failed to find PID for port " << port <<" packet type: "<< packetProtocol << std::endl;
+        return false; // failed to find pid
+    }
+    
+    // update the port pid map with the new pid from files 
+    portPidMap->insertOrAssign(port, pid);
+    return true;
+}

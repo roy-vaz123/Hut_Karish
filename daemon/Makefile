@@ -5,6 +5,7 @@ CXXFLAGS = -Wall -std=c++17 \
     -Iinclude \
     -I../shared/netlink_client \
 	-I../shared/message_queue \
+	-I../shared/thread_safe_unordered_map \
     -I../shared/config
 
 LDFLAGS = ../build/lib/libshared.a

@@ -1,8 +1,4 @@
 #include "UnixSocketServer.h"
-#include <sys/socket.h> // socket functions (accept, bind) and constants
-#include <sys/un.h>// unix domain socket adress structure (sockaddr_un)
-#include <cstring> // string functions
-#include <iostream>// debug, might move later
 
 // takes the path to the socket file as input
 UnixSocketServer::UnixSocketServer(const std::string& socketPath)
@@ -31,15 +27,15 @@ bool UnixSocketServer::start() {
     unlink(socketPath.c_str());
 
     // Bind the socket to the file path
-    if (bind(serverFd, (sockaddr*)&addr, sizeof(addr)) < 0) {
+    if (bind(serverFd, reinterpret_cast<sockaddr*>(&addr), sizeof(addr)) < 0) {
         perror("bind");// for testing change to loggong later
         return false;
     }
 
     // Start listening for incoming connections, somaxcon to allow maximum pending connections
-    if (listen(serverFd, SOMAXCONN) < 0) {
-        perror("listen");
-        close(serverFd);
+    if (listen(serverFd, SOMAXCONN) < 0) {// fail to listen
+        perror("listen");// logging
+        stop();
         return false;
     }
 
@@ -59,8 +55,7 @@ void UnixSocketServer::stop() {
 // Send a uint16_t value to a specific client
 bool UnixSocketServer::sendPid(int clientFd, pid_t pid) const {
     ssize_t sent = write(clientFd, &pid, sizeof(pid));// It doest matter that pid is local since we only need the value
-    if(sent == sizeof(pid)) return true;
-    return false;// If they arnt equal the was problem with sending the message
+    return sent == sizeof(pid);// If they arnt equal the was problem with sending the message
 }
 
 // Receive a port number from a specific client, check if message recieved or client disconnected (write to port memory)
@@ -71,10 +66,12 @@ bool UnixSocketServer::receivePort(int clientFd, uint16_t& port) const {
     if (bytes == 0) {// If the message is 0 bytes, the client disconnected
         std::cout << "Client disconnected (fd=" << clientFd << ")\n";
         return false;
-    } else if (bytes < 0) {// these are probably problems with the socket
+    }
+    if (bytes < 0) {// these are probably problems with the socket
         perror("read");
         return false;
-    } else if (bytes != sizeof(port)) {
+    }
+    if (bytes != sizeof(port)) {
         std::cerr << "Bad message (fd=" << clientFd << ")\n";
         return false;
     }

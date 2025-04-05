@@ -5,8 +5,10 @@
         "includePath": [
           "${workspaceFolder}/app/include",
           "${workspaceFolder}/daemon/include",
+          "${workspaceFolder}/shared",
           "${workspaceFolder}/shared/netlink_client",
           "${workspaceFolder}/shared/message_queue",
+          "${workspaceFolder}/shared/thread_safe_unordered_map",          
           "${workspaceFolder}/shared/config",
           "/usr/include",
           "/usr/include/linux"

@@ -6,8 +6,8 @@
 #include <regex>
 #include <string>
 #include <sstream>
-
 #include <vector>// Keep vector of (inode, port) pairs
+#include <cstddef> // For size_t
 #include <iostream>// debugging for now (maybe remove later)
 
 // to clean the code a bit
@@ -88,7 +88,7 @@ namespace ScanFiles {
                 if (ec) continue;
 
                 // We looking for symlinks in format: socket:[123456], continue if not found
-                size_t start = link.find("socket:[");
+                std::size_t start = link.find("socket:[");
                 if (start == std::string::npos) continue;
 
                 // Get the inode of the socket from the symlink and compare it to the one we are looking for
@@ -102,8 +102,7 @@ namespace ScanFiles {
     }
 
     // Intialize the map of ports to PIDs by scanning the system files
-    std::unordered_map<uint16_t, pid_t> initializePortPidMap() {
-        std::unordered_map<uint16_t, pid_t> map;
+    void initializePortPidMap(ThreadSafeUnorderedMap<uint16_t, pid_t>& map) {
         std::string inode;
         uint16_t port;
         pid_t pid;
@@ -122,7 +121,7 @@ namespace ScanFiles {
             // Find the pid of the process using the socket inode, and update the map
             pid = findPidBySockInode(inode);
             if (pid != -1) {
-                map[port] = pid;
+                map.insertOrAssign(port, pid);
             }
         }
 
@@ -134,11 +133,9 @@ namespace ScanFiles {
             // Find the pid of the process using the socket inode, and update the map
             pid = findPidBySockInode(inode);
             if (pid != -1) {
-                map[port] = pid;
+                map.insertOrAssign(port, pid);
             }
         }
-
-        return map;
     }
 
     // Find new port linked pid if its not already in the map
