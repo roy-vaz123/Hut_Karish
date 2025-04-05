@@ -1,7 +1,7 @@
 # app/Makefile
 
 CXX = g++
-CXXFLAGS = -Wall -std=c++17 -I../shared/netlink_client -I../shared/message_queue -I../shared/config -Iinclude
+CXXFLAGS = -Wall -std=c++17 -I../shared/netlink_client -I../shared/message_queue -I../shared/thread_safe_unordered_map -I../shared/config -Iinclude
 LDFLAGS = ../build/lib/libshared.a
 TARGET = ../build/app/app
 

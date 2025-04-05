@@ -3,13 +3,14 @@
 
 
 #ifdef __KERNEL__
-
+// for kernel space only
 #include <linux/types.h>   // for __u32, __u16
 typedef __u32 uint32_t;
 typedef __u16 uint16_t;
-
 #else
-#include <stdint.h>        // only for user-space
+
+// only for user-space
+#include <stdint.h>        
 
 #endif
 

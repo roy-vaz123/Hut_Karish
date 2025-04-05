@@ -1389,8 +1389,8 @@ deps_/home/roy/projects/hut_karish/kernel_module/sniffer.o := \
   /usr/src/linux-headers-6.1.0-32-common/include/linux/if_link.h \
   /usr/src/linux-headers-6.1.0-32-common/include/uapi/linux/if_link.h \
   /usr/src/linux-headers-6.1.0-32-common/include/uapi/linux/if_bonding.h \
-  /usr/src/linux-headers-6.1.0-32-common/include/uapi/linux/pckt_cls.h \
-  /usr/src/linux-headers-6.1.0-32-common/include/uapi/linux/pckt_sched.h \
+  /usr/src/linux-headers-6.1.0-32-common/include/uapi/linux/pkt_cls.h \
+  /usr/src/linux-headers-6.1.0-32-common/include/uapi/linux/pkt_sched.h \
   /usr/src/linux-headers-6.1.0-32-common/include/linux/hashtable.h \
   /usr/src/linux-headers-6.1.0-32-common/include/linux/netfilter/nf_conntrack_zones_common.h \
   /usr/src/linux-headers-6.1.0-32-common/include/uapi/linux/netfilter/nf_conntrack_tuple_common.h \

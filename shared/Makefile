@@ -1,7 +1,7 @@
 # shared/Makefile
 
 CXX = g++
-CXXFLAGS = -Wall -std=c++17 -I. -I./netlink -I./config
+CXXFLAGS = -Wall -std=c++17 -I. -I./netlink -I./message_queue -I./thread_safe_unordered_map -I./config
 AR = ar
 ARFLAGS = rcs
 OUTDIR = ../build/lib
