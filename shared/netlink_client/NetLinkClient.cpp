@@ -42,6 +42,7 @@ NetLinkClient::NetLinkClient() {
 NetLinkClient::~NetLinkClient() {
     if (sock_fd != -1) {
         close(sock_fd);
+        sock_fd = -1;
     }
 }
 
@@ -93,7 +94,7 @@ const pckt_info* NetLinkClient::receivePacketInfo() const {
     char buffer[MAX_PAYLOAD];
     struct nlmsghdr* nlh = reinterpret_cast<struct nlmsghdr*>(buffer);
 
-    int len = recv(sock_fd, nlh, MAX_PAYLOAD, 0);
+    int len = recv(sock_fd, nlh, MAX_PAYLOAD, 0);// blocking call
     if (len < 0) {
         perror("recv");
         return nullptr;

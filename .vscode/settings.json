@@ -66,6 +66,7 @@
     "thread": "cpp",
     "typeinfo": "cpp",
     "userspaceconfig": "cpp",
-    "optional": "cpp"
+    "optional": "cpp",
+    "csignal": "cpp"
   }
 }

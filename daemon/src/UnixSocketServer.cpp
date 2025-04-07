@@ -6,8 +6,17 @@ UnixSocketServer::UnixSocketServer(const std::string& socketPath)
 
 // clean up socket if still open
 UnixSocketServer::~UnixSocketServer() {
-    stop();
+    if (serverFd != -1) {
+       closeSocket();
+    }
 }
+
+ // Closes the socket
+ void UnixSocketServer::closeSocket(){
+    close(serverFd);
+    serverFd = -1; // common safe practive
+    unlink(socketPath.c_str());  // Clean up the socket file
+ }
 
 // Starts the unix socket server. return true on success and false on failure
 bool UnixSocketServer::start() {
@@ -35,21 +44,13 @@ bool UnixSocketServer::start() {
     // Start listening for incoming connections, somaxcon to allow maximum pending connections
     if (listen(serverFd, SOMAXCONN) < 0) {// fail to listen
         perror("listen");// logging
-        stop();
+        closeSocket();
         return false;
     }
 
     std::cout << "Server socket setup complete. Waiting for clients...\n";// logging
     return true;
 
-}
-
-void UnixSocketServer::stop() {
-    if (serverFd != -1) {
-        close(serverFd);
-        serverFd = -1; // common safe practive
-        unlink(socketPath.c_str());  // Clean up the socket file
-    }
 }
 
 // Send a uint16_t value to a specific client
@@ -60,11 +61,10 @@ bool UnixSocketServer::sendPid(int clientFd, pid_t pid) const {
 
 // Receive a port number from a specific client, check if message recieved or client disconnected (write to port memory)
 bool UnixSocketServer::receivePort(int clientFd, uint16_t& port) const {
-    ssize_t bytes = read(clientFd, &port, sizeof(port));
+    ssize_t bytes = read(clientFd, &port, sizeof(port));// blocking call
     
     // Check if message recieved succecsfully
-    if (bytes == 0) {// If the message is 0 bytes, the client disconnected
-        std::cout << "Client disconnected (fd=" << clientFd << ")\n";
+    if (bytes == 0) {// If the message is 0 bytes, the client probably disconnected
         return false;
     }
     if (bytes < 0) {// these are probably problems with the socket
@@ -82,4 +82,20 @@ bool UnixSocketServer::receivePort(int clientFd, uint16_t& port) const {
 // Returns the servers fd
 int UnixSocketServer::getServerFd() const{
     return this->serverFd;
+}
+
+// Stops the server from listening for new clients(closes client/server fds, unlinks socket path)
+// by sending a fake empty connection to break the accept block
+void UnixSocketServer::stopListeningForNewClients() const{
+    int tmpSock = socket(AF_UNIX, SOCK_STREAM, 0);// Opens temporary socket for dummy connection
+    if (tmpSock >= 0) {
+        // initilize socket to simulate client
+        sockaddr_un addr{};
+        addr.sun_family = AF_UNIX;
+        std::strncpy(addr.sun_path, socketPath.c_str(), sizeof(addr.sun_path) - 1);
+        
+        // connect to server to break block, then disconnect
+        connect(tmpSock, (sockaddr*)&addr, sizeof(addr));
+        close(tmpSock);  // one-time connection
+    }
 }

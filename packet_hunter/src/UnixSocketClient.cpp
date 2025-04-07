@@ -66,3 +66,13 @@ void UnixSocketClient::disconnect() {
 int UnixSocketClient::getSocketFd() const {
     return sockFd;
 }
+
+// Check if daemon still alive 
+bool UnixSocketClient::isServerAlive() const {
+    if (!isConnected) return false;
+    
+    // try to send send 0 bytes to server, wont actually send anything but will check the connection
+    ssize_t result = send(sockFd, nullptr, 0, MSG_NOSIGNAL);
+
+    return result >= 0;// Returns if sent succeccfully
+}

@@ -28,6 +28,9 @@ public:
     // Returns the socket file descriptor
     int getSocketFd() const;
 
+    // Check if daemon still alive 
+    bool isServerAlive() const;
+
 private:
     std::string socketPath; // Path to the socket
     int sockFd;             // File descriptor for the socket

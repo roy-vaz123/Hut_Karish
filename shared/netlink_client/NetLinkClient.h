@@ -18,6 +18,8 @@ public:
     const pckt_info* receivePacketInfo() const;  
     void freePacketInfo(const pckt_info* pckt) const; // free the packet info structure, the same allocator that allocated the memory (extra safety)
     
+    // Shutdown netlink client
+    void shutDownClient();
 
 private:
     int sock_fd;                  // socket file descriptor
