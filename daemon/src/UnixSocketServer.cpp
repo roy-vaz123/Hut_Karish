@@ -1,8 +1,8 @@
 #include "UnixSocketServer.h"
 
 // takes the path to the socket file as input
-UnixSocketServer::UnixSocketServer(const std::string& socketPath)
-    : socketPath(socketPath), serverFd(-1){ start(); } // initialize the socket file path and server fd
+UnixSocketServer::UnixSocketServer()
+    : socketPath(SOCKET_FILE_ADRESS), serverFd(-1), clientFd(-1){ start(); } // initialize the socket file path and server fd
 
 // clean up socket if still open
 UnixSocketServer::~UnixSocketServer() {
@@ -13,6 +13,8 @@ UnixSocketServer::~UnixSocketServer() {
 
  // Closes the socket
  void UnixSocketServer::closeSocket(){
+    closeClientFd();// close the clientFd if open
+    // Close the socket
     close(serverFd);
     serverFd = -1; // common safe practive
     unlink(socketPath.c_str());  // Clean up the socket file
@@ -47,20 +49,18 @@ bool UnixSocketServer::start() {
         closeSocket();
         return false;
     }
-
-    std::cout << "Server socket setup complete. Waiting for clients...\n";// logging
     return true;
 
 }
 
 // Send a uint16_t value to a specific client
-bool UnixSocketServer::sendPid(int clientFd, pid_t pid) const {
+bool UnixSocketServer::sendPid(pid_t pid) const {
     ssize_t sent = write(clientFd, &pid, sizeof(pid));// It doest matter that pid is local since we only need the value
     return sent == sizeof(pid);// If they arnt equal the was problem with sending the message
 }
 
 // Receive a port number from a specific client, check if message recieved or client disconnected (write to port memory)
-bool UnixSocketServer::receivePort(int clientFd, uint16_t& port) const {
+bool UnixSocketServer::receivePort(uint16_t& port) const {
     ssize_t bytes = read(clientFd, &port, sizeof(port));// blocking call
     
     // Check if message recieved succecsfully
@@ -82,6 +82,28 @@ bool UnixSocketServer::receivePort(int clientFd, uint16_t& port) const {
 // Returns the servers fd
 int UnixSocketServer::getServerFd() const{
     return this->serverFd;
+}
+
+// Wait for client connection and connect
+bool UnixSocketServer::connectToClient(){
+    clientFd = accept(serverFd, nullptr, nullptr);// blocking waiting for the app to connect to daemon using socket accept
+    if (clientFd < 0) {
+        return false;// Failed to connecto to client
+    }
+    std::cout << "Client connected (fd=" << clientFd << ")\n";// logging
+    return true;
+}
+
+int UnixSocketServer::getClientFd() const{
+    return clientFd;
+}
+
+// Disconnects client to allow new client 
+void UnixSocketServer::closeClientFd(){
+    if(clientFd != -1){
+        close(clientFd);
+        clientFd = -1;
+    }
 }
 
 // Stops the server from listening for new clients(closes client/server fds, unlinks socket path)

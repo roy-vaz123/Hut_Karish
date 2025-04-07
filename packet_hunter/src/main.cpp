@@ -1,15 +1,13 @@
 #include "UserSpaceConfig.h"// for useful headers and shared pointers
 #include "UnixSocketClient.h"// for the client
 #include "PidToPacketsInfoMap.h"// for the map
+
 #include <vector>
 // To print ip address
 #include <arpa/inet.h>
 #include <netinet/in.h>
 #include <iostream>
    
-using UnixSocketClientPtr = std::shared_ptr<const UnixSocketClient>;
-using PidToPacketsMapPtr = std::shared_ptr<PidToPacketsInfoMap>;
-
 int main() {
     
     // Capture signals to end the program
@@ -18,8 +16,8 @@ int main() {
 
     NetLinkClientPtr netLinkClient = std::make_shared<NetLinkClient>();// Create Netlink client
     MessageQueuePtr messageQueue = std::make_shared<MessageQueue>();// Create the message queue
-    PidToPacketsMapPtr pidToPacketsMap = std::make_shared<PidToPacketsInfoMap>(); // Map to store packets by PID
-    UnixSocketClientPtr unixClient = std::make_shared<UnixSocketClient>(); // Create Unix socket client
+    PidToPacketsInfoMap pidToPcktMap; // Map to store packets by PID
+    UnixSocketClient unixClient; // Create Unix socket client
     pid_t pid; // Get the pid of the current packet
     
 
@@ -40,17 +38,18 @@ int main() {
             // If queue is empty, wait a bit before checking again (avoid busy looping)
             std::this_thread::sleep_for(std::chrono::milliseconds(5));
             // Check if daemon is still alive, if its not, close the packet_hunter
-            if(!unixClient->isServerAlive()) running = false;
+            if(!unixClient.isServerAlive()) running = false;
             continue;
         }
-        if(pidToPacketsMap->containsPacket(pckt)) continue;// Check if the packet already exists in the map, if so, skip it
+        if(pidToPcktMap.containsPacket(pckt)) continue;// Check if the packet already exists in the map, if so, skip it
         
         // Delay a bit to allow daemon to find pid, if the port is new for it
         std::this_thread::sleep_for(std::chrono::milliseconds(10));
         
         //find packets dest pid and insert to map
-        if(!unixClient->sendPort(pckt->dst_port)) break; // Send the packets port to the deamon
-        if(!unixClient->receivePid(pid)) break; // Receive the pid from the deamon
+        if(!unixClient.sendPort(pckt->dst_port)) break; // Send the packets port to the deamon
+        if(!unixClient.receivePid(pid)) break; // Receive the pid from the deamon
+        
         // Prepare for printing IP address
         struct in_addr ip_addr;
         ip_addr.s_addr = pckt->src_ip;
@@ -61,7 +60,7 @@ int main() {
         } else {
             std::cout << "Received packet: Pid unknown src_ip: " << inet_ntoa(ip_addr) << ", proto: " << pckt->proto << "\n";
         }
-        pidToPacketsMap->insertPacketInfo(pid, pckt); // Insert the packet into the map    
+        pidToPcktMap.insertPacketInfo(pid, pckt); // Insert the packet into the map    
     }
 
      // Unsubscribe from kernel module messages and join packet listener thread
@@ -75,7 +74,7 @@ int main() {
     SharedUserFucntions::cleanMessageQueue(messageQueue, netLinkClient);
 
     // Free all stored packets in the map
-    for (const auto& pair : pidToPacketsMap->getMap()) {
+    for (const auto& pair : pidToPcktMap.getMap()) {
         for (const pckt_info* pckt : pair.second) {
             netLinkClient->freePacketInfo(pckt); // Free the allocated memory for the message
         }
