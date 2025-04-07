@@ -78,6 +78,8 @@ bool UnixSocketServer::receivePort(int clientFd, uint16_t& port) const {
 
     return true;
 }
+
+// Returns the servers fd
 int UnixSocketServer::getServerFd() const{
     return this->serverFd;
 }

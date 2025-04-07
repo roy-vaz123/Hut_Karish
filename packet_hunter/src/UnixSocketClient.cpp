@@ -1,13 +1,15 @@
 #include "UnixSocketClient.h"
 
-
+// Ctor inilialize Unix clint socket, and connect to server
 UnixSocketClient::UnixSocketClient()
     : socketPath(SOCKET_FILE_ADRESS), sockFd(-1), isConnected(false) { connectToServer(); }// Initialize socket path and file descriptor
 
+// Disconnect from server on destruction
 UnixSocketClient::~UnixSocketClient() {
     disconnect();
 }
 
+// Connect to server (called in ctor)
 bool UnixSocketClient::connectToServer() {
     // Create a unix domain socket (sock_stream is rlieable, like tcp but local)
     sockFd = socket(AF_UNIX, SOCK_STREAM, 0);
@@ -43,6 +45,7 @@ bool UnixSocketClient::sendPort(uint16_t port) const {
     return bytesSent == sizeof(port);
 }
 
+// Recieves pid from daemon server
 bool UnixSocketClient::receivePid(pid_t& pid) const {
     if (!isConnected) return false;// check if the socket is connected
 
@@ -51,6 +54,7 @@ bool UnixSocketClient::receivePid(pid_t& pid) const {
     return bytesReceived == sizeof(pid);
 }
 
+// Disconnect from server, used in destructor
 void UnixSocketClient::disconnect() {
     if (isConnected) {
         close(sockFd);// close the socket

@@ -13,6 +13,11 @@ void AppThreadsMap::joinAll() {
 // Inserts a new appthread into the map, using std::move to avoid copying
 void AppThreadsMap::insertAppThread(int clientFd, std::thread&& t){
     std::unique_lock<std::shared_mutex> lock(this->mtx); // Unique lock for changing the map
+    // First check if clientFd already in the map
+    if(map.find(clientFd) != map.end()){
+        map[clientFd].join();// Its safe, because if clientFd was assigned we know the connection was closed
+    }
+    
     this->map[clientFd] = std::move(t);
 }
 

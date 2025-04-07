@@ -6,32 +6,37 @@
 #include <arpa/inet.h>
 #include <netinet/in.h>
 #include <iostream>
-
+   
 using UnixSocketClientPtr = std::shared_ptr<const UnixSocketClient>;
 using PidToPacketsMapPtr = std::shared_ptr<PidToPacketsInfoMap>;
 
 // The thread that will listen and receive messages from the kernel module
-void recvThread(NetLinkClientRecievePtr client, MessageQueuePtr messageQueue);
+void recvThread(NetLinkClientRecievePtr client, MessageQueuePtr messageQueue, std::atomic<bool>& running);
 
 int main() {
     
+    // Capture signals to end the program
+    std::signal(SIGINT, handleSignal); // For Ctrl+C
+    std::signal(SIGTERM, handleSignal);// For terminate (will be sent from main menu script) 
+
     NetLinkClientPtr netLinkClient = std::make_shared<NetLinkClient>();// Create Netlink client
     MessageQueuePtr messageQueue = std::make_shared<MessageQueue>();// Create the message queue
     PidToPacketsMapPtr pidToPacketsMap = std::make_shared<PidToPacketsInfoMap>(); // Map to store packets by PID
     UnixSocketClientPtr unixClient = std::make_shared<UnixSocketClient>(); // Create Unix socket client
     pid_t pid; // Get the pid of the current packet
     
+
     // subscribe to kernel module messages
-    if (!netLinkClient->sendMessage("app_subscribe")) {
+    if (!netLinkClient->sendMessage("packet_hunter_subscribe")) {
         std::cerr << "Failed to send message to kernel\n";
         return -1;
     }
     
-    // Start the receiver thread
-    std::thread listener(recvThread, NetLinkClientRecievePtr(netLinkClient), messageQueue);
+    // Start the receiver thread, std::ref meeded to pass reference to thread 
+    std::thread packetsListener(recvThread, NetLinkClientRecievePtr(netLinkClient), messageQueue, std::ref(running));
 
     // Main loop: poll the queue for messages
-    while (true) {
+    while (running) {
         
         const pckt_info* pckt = messageQueue->pop();
         if (!pckt) {
@@ -57,32 +62,37 @@ int main() {
         pidToPacketsMap->insertPacketInfo(pid, pckt); // Insert the packet into the map    
     }
 
-    // Stop receiver thread
-    listener.join();
+    // join packet listener thread
+    packetsListener.join();
 
     // Unsubscribe from kernel module messages
-    if (!netLinkClient->sendMessage("app_unsubscribe")) {
+    if (!netLinkClient->sendMessage("packet_hunter_unsubscribe")) {
         std::cerr << "Failed to send message to kernel\n";
         return -1;
     }
     
-    // Free all stored packets
+    // Free all stored packets in messages queue
+    cleanMessageQueue(messageQueue, netLinkClient);
+
+    // Free all stored packets in the map
     for (const auto& pair : pidToPacketsMap->getMap()) {
         for (const pckt_info* pckt : pair.second) {
             netLinkClient->freePacketInfo(pckt); // Free the allocated memory for the message
         }
     }
-
+    std::cout << "Packet hunter terminated "<< std::endl;
     return 0;
 }
 
 // The thread that will listen and receive messages from the kernel module
-void recvThread(NetLinkClientRecievePtr client, MessageQueuePtr messageQueue) {
-    while (true) {
+void recvThread(NetLinkClientRecievePtr client, MessageQueuePtr messageQueue, std::atomic<bool>& running) {
+    while (running) {
         const pckt_info* pckt = client->receivePacketInfo();
         if (pckt) {
             messageQueue->push(pckt);
         }
     }
 }
+
+
 

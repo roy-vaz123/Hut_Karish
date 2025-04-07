@@ -8,7 +8,6 @@
 #include <syslog.h>// for log (no cout for daemons)
 #include <iostream>
 
-
 // Shared pointers to share data through threads, safe to use end easier to manage the global vars
 using PortToPidMapReadPtr = std::shared_ptr<const ThreadSafeUnorderedMap<uint16_t, pid_t>>;// for the port to pid map
 using PortToPidMapPtr = std::shared_ptr<ThreadSafeUnorderedMap<uint16_t, pid_t>>;// for the port to pid map
@@ -32,6 +31,10 @@ bool updatePortPidMap(uint16_t port, PortToPidMapPtr portPidMap, char packetProt
 
 int main() {
     
+    // Capture signals to end the program
+    std::signal(SIGINT, handleSignal); // For Ctrl+C
+    std::signal(SIGTERM, handleSignal);// For terminate (will be sent from main menu script) 
+ 
     // Using syslog for logging, using log_daemon format, writes to /var/log/syslog app name portmon_daemon, print error to conlose
     openlog("portmon_daemon", LOG_PID | LOG_CONS, LOG_DAEMON);
     
@@ -61,7 +64,7 @@ int main() {
     std::thread packetInfoListener(recvPacketInfoThread, NetLinkClientRecievePtr(client), messageQueue);
 
     // Main loop: poll the queue for messages
-    while (true) {
+    while (running) {
         const pckt_info* pckt = messageQueue->pop();
         if (!pckt) {
             // If queue is empty, wait a bit before checking again (avoid busy looping)
@@ -88,24 +91,20 @@ int main() {
         return -1;
     }
     
-    // Free all remaing packets in the message queue
-    while (!messageQueue->empty()){
-        const pckt_info* pckt = messageQueue->pop();
-        if (pckt) {
-            client->freePacketInfo(pckt);// free the allocated memory for the message
-        }
-    }
+    //Free remainig messages in message queue
+    cleanMessageQueue(messageQueue, client);
 
     // Join all connected app threads for clean clousure
     connectedApps->joinAll();
     appClientConnectionListener.join();// join the app connection listener thread
     
+    std::cout << "Port Monitor Daemon terminated" << std::endl; // logging
     return 0;
 }
 
 // The thread thall listen and receive messages from the kernel module
 void recvPacketInfoThread(NetLinkClientRecievePtr client, MessageQueuePtr messageQueue) {
-    while (true) {
+    while (running) {
         const pckt_info* pckt = client->receivePacketInfo();// allocate memory for the packet!!!!!
         if (pckt) {
             messageQueue->push(pckt);
@@ -117,7 +116,7 @@ void recvPacketInfoThread(NetLinkClientRecievePtr client, MessageQueuePtr messag
 void appConnectionThread(int clientFd, UnixSocketServerPtr appsCommServer, PortToPidMapReadPtr portPidMap, ConnectedAppsMapPtr connectedApps) {
     uint16_t port;
     const pid_t* pid;
-    while (true) {
+    while (running) {
         if(!appsCommServer->receivePort(clientFd, port)) break;// blocking, waiting to recieve message from client
         
         // Get the ports pid or nullptr if unknown and send to client
@@ -135,14 +134,13 @@ void appConnectionThread(int clientFd, UnixSocketServerPtr appsCommServer, PortT
     close(clientFd);
 
     // Remove the app from the connectedApps map
-    connectedApps->erase(clientFd);// the app disconnected, remove it from the map
     std::cout << "Client disconnected (fd=" << clientFd << ")\n";// logging
 }
 
 // Runs on a seperate thread, insert new clients connecting to the connectedApps map
 void acceptAppConnectionThread(UnixSocketServerPtr appsCommServer, PortToPidMapReadPtr portPidMap, ConnectedAppsMapPtr connectedApps) {
     int serverFd = appsCommServer->getServerFd();
-    while (true) {
+    while (running) {
         int clientFd = accept(serverFd, nullptr, nullptr);// blocking waiting for new apps to connect to daemon
         if (clientFd < 0) {
             perror("accept");

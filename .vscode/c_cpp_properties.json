@@ -3,7 +3,7 @@
       {
         "name": "User Space",
         "includePath": [
-          "${workspaceFolder}/app/include",
+          "${workspaceFolder}/packet_hunter/include",
           "${workspaceFolder}/daemon/include",
           "${workspaceFolder}/shared",
           "${workspaceFolder}/shared/netlink_client",

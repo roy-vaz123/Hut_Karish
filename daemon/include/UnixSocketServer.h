@@ -3,7 +3,7 @@
 #include "UnixSocketConfig.h"  // needed headers and the socket file path
 
 // Thought about making this singleton, but my solution with shared pointers is easier to manage with multythreading
-// Used to communicate with the apps, receive port and send pid from the map
+// Used to communicate with the packet_hunters, receive port and send pid from the map
 class UnixSocketServer {
 public:
     // ctor takes the path to the socket file
