@@ -1,6 +1,7 @@
 #pragma once
 
 #include "UnixSocketConfig.h"  // needed headers and the socket file path
+#include <syslog.h> // added for syslog
 
 // Thought about making this singleton, but my solution with shared pointers is easier to manage with multythreading
 // Used to communicate with the packet_hunters, receive port and send pid from the map

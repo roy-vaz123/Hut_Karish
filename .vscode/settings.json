@@ -67,6 +67,7 @@
     "typeinfo": "cpp",
     "userspaceconfig": "cpp",
     "optional": "cpp",
-    "csignal": "cpp"
+    "csignal": "cpp",
+    "cerrno": "cpp"
   }
 }

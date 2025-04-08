@@ -1,33 +1,61 @@
 #!/bin/bash
 
 KERNEL_MODULE="build/kernel_module/sniffer.ko"
-DAEMON_EXEC="sudo ./build/daemon/portmon_daemon"
+DAEMON_SERVICE="portmon_daemon"
 APP_EXEC="sudo ./build/packet_hunter/packet_hunter"
 
 LAST_CMD=""
 
 # Load the kernel module
 function load_kernel() {
-    sudo insmod "$KERNEL_MODULE"
-    LAST_CMD="Loaded Kernel Module"
+    if sudo insmod "$KERNEL_MODULE"; then
+        LAST_CMD="Loaded Kernel Module"
+    else
+        LAST_CMD="Error: Failed to load Kernel Module"
+    fi
 }
 
 # Unload the kernel module
 function unload_kernel() {
-    sudo rmmod "$KERNEL_MODULE"
-    LAST_CMD="Removed Kernel Module"
+    if sudo rmmod "$KERNEL_MODULE"; then
+        LAST_CMD="Removed Kernel Module"
+    else
+        LAST_CMD="Error: Failed to remove Kernel Module"
+    fi
 }
 
-# Start the daemon in a new terminal
+# Start the daemon via systemd
 function start_daemon() {
-    gnome-terminal -- bash -c "$DAEMON_EXEC; exec bash" &
-    LAST_CMD="Started Daemon"
+    if sudo systemctl start "$DAEMON_SERVICE"; then
+        LAST_CMD="Started Daemon"
+    else
+        LAST_CMD="Error: Failed to start Daemon"
+    fi
+}
+
+# Stop the daemon via systemd
+function stop_daemon() {
+    if sudo systemctl stop "$DAEMON_SERVICE"; then
+        LAST_CMD="Stopped Daemon"
+    else
+        LAST_CMD="Error: Failed to stop Daemon"
+    fi
 }
 
 # Start the packet hunter in a new terminal
 function start_packetHunter() {
-    gnome-terminal -- bash -c "$APP_EXEC; exec bash" &
-    LAST_CMD="Started Packet Hunter"
+    if gnome-terminal -- bash -c "$APP_EXEC; exec bash" &>/dev/null; then
+        LAST_CMD="Started Packet Hunter"
+    else
+        LAST_CMD="Error: Failed to start Packet Hunter"
+    fi
+}
+
+# Show daemon logs
+function view_daemon_logs() {
+    clear
+    echo "Tailing daemon logs (Ctrl+C to stop)..."
+    sudo journalctl -u "$DAEMON_SERVICE" -f
 }
 
 # Show kernel messages
@@ -44,9 +72,11 @@ function show_menu() {
     echo "1. Load Kernel Module"
     echo "2. Unload Kernel Module"
     echo "3. Start Daemon"
-    echo "4. Start PacketHunter (client)"
-    echo "5. Tail dmesg (kernel module output)"
-    echo "6. Exit"
+    echo "4. Stop Daemon"
+    echo "5. Start PacketHunter (client)"
+    echo "6. Tail dmesg (kernel module output)"
+    echo "7. View Daemon Logs"
+    echo "8. Exit"
     echo "======================================="
     echo
     echo "Last Command: $LAST_CMD"
@@ -67,9 +97,11 @@ while true; do
         1) load_kernel ;;
         2) unload_kernel ;;
         3) start_daemon ;;
-        4) start_packetHunter ;;
-        5) tail_dmesg ;;
-        6) echo "Exiting..."; exit 0 ;;
+        4) stop_daemon ;;
+        5) start_packetHunter ;;
+        6) tail_dmesg ;;
+        7) view_daemon_logs ;;
+        8) echo "Exiting..."; exit 0 ;;
         *) echo "Invalid option"; sleep 1 ;;
     esac
 done

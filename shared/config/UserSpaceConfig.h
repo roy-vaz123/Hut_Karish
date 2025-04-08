@@ -16,12 +16,10 @@ using NetLinkClientPtr = std::shared_ptr<NetLinkClient>;// not const because sen
 using NetLinkClientRecievePtr = std::shared_ptr<const NetLinkClient>;
 
 
-
 // Tells the threads when to stop
 static std::atomic<bool> running{true};
-
 // Handle signal from main manu script (use to safely end the program)
-static void handleSignal(int signum) {
+static void handleSignal(int signum){
     running = false;
 }
 

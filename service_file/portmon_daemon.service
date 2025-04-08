@@ -1,0 +1,19 @@
+# This file tells systemd (incharge of boot and backgroud processess)
+# how to handle the daemon, for it to work (the main menu scrip rely on it) it needs to be
+# located at /etc/systemd/system/portmon_daemon.service
+
+[Unit]
+Description=Port Monitor Daemon
+
+# Don't start until networking is ready
+After=network.target                   
+
+[Service]
+Type=simple
+ExecStart=/home/roy/projects/hut_karish/build/daemon/portmon_daemon
+
+# The signal sent to stop it
+KillSignal=SIGTERM
+
+# Restart it if it crashes (exit code ≠ 0)
+Restart=on-failure                      

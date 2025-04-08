@@ -1,4 +1,5 @@
 #include "UnixSocketServer.h"
+#include <cstring> // Required for strerror
 
 // takes the path to the socket file as input
 UnixSocketServer::UnixSocketServer()
@@ -25,7 +26,7 @@ bool UnixSocketServer::start() {
     // Create a unix domain socket (sock_stream is rlieable, like tcp but local)
     serverFd = socket(AF_UNIX, SOCK_STREAM, 0);
     if (serverFd < 0) {
-        perror("socket");// for testing change to loggong later
+        syslog(LOG_ERR, "socket failed: %s", strerror(errno));
         return false;
     }
 
@@ -39,13 +40,13 @@ bool UnixSocketServer::start() {
 
     // Bind the socket to the file path
     if (bind(serverFd, reinterpret_cast<sockaddr*>(&addr), sizeof(addr)) < 0) {
-        perror("bind");// for testing change to loggong later
+        syslog(LOG_ERR, "bind failed: %s", strerror(errno));
         return false;
     }
 
     // Start listening for incoming connections, somaxcon to allow maximum pending connections
     if (listen(serverFd, SOMAXCONN) < 0) {// fail to listen
-        perror("listen");// logging
+        syslog(LOG_ERR, "listen failed: %s", strerror(errno));
         closeSocket();
         return false;
     }
@@ -68,11 +69,11 @@ bool UnixSocketServer::receivePort(uint16_t& port) const {
         return false;
     }
     if (bytes < 0) {// these are probably problems with the socket
-        perror("read");
+        syslog(LOG_ERR, "read failed: %s", strerror(errno));
         return false;
     }
     if (bytes != sizeof(port)) {
-        std::cerr << "Bad message (fd=" << clientFd << ")\n";
+        syslog(LOG_ERR, "Bad message (fd=%d)", clientFd);
         return false;
     }
 
@@ -90,7 +91,7 @@ bool UnixSocketServer::connectToClient(){
     if (clientFd < 0 || isShuttingDown) {
         return false;// Failed to connecto to client
     }
-    std::cout << "Client connected (fd=" << clientFd << ")\n";// logging
+    syslog(LOG_INFO, "Client connected (fd=%d)", clientFd);
     return true;
 }
 

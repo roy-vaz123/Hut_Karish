@@ -5,9 +5,9 @@ PortToPidMap::PortToPidMap(){
     
     ScanFiles::initializePortPidMap(map);// Scan the files to fill map
     
-    std::cout << "Port Pid Mapping When Daemon Started: " << std::endl;// logging
+    syslog(LOG_INFO, "Port Pid Mapping When Daemon Started:");
     for(const auto& pair : map){// logging
-        std::cout << "port " << pair.first << " pid "<< pair.second << std::endl;// logging
+        syslog(LOG_INFO, "port %u pid %d", pair.first, pair.second);
     }
     
 }
@@ -18,7 +18,7 @@ bool PortToPidMap::addPidMapping(uint16_t port, char protocol){
     
     pid_t pid = ScanFiles::scanForPidByPort(port, protocol);// find the pid of the process using the port
     if(pid == -1) {
-        std::cerr << "Failed to find PID for port " << port <<" packet type: "<< protocol << std::endl;// logging
+        syslog(LOG_ERR, "Failed to find PID for port %u packet type: %c", port, protocol);
         return false; // failed to find pid
     }
     

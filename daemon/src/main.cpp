@@ -4,7 +4,7 @@
 #include <unistd.h> // files functions (close, unlink, read, write)
 #include <sys/socket.h> // for socket functions like accept
 #include <syslog.h>// for log (no cout for daemons)
-#include <iostream>
+
 
 // Shared pointers to share data through threads, safe to use end easier to manage the global vars
 using PortToPidMapReadPtr = std::shared_ptr<const PortToPidMap>;// for the port to pid map
@@ -22,11 +22,14 @@ int main() {
     
     // Capture signals to end the program
     std::signal(SIGINT, handleSignal); // For Ctrl+C
+    std::signal(SIGTERM, handleSignal);// For terminate (will be sent from main menu script) 
 
+    
     // Using syslog for logging, using log_daemon format, writes to /var/log/syslog app name portmon_daemon, print error to conlose
     openlog("portmon_daemon", LOG_PID | LOG_CONS, LOG_DAEMON);
-    std::cout << "Activated Port Mon Daemon" << std::endl; // logging
-
+ 
+    syslog(LOG_INFO, "Activated Port Monitor Terminal");
+ 
     // Initilize the global variables
     NetLinkClientPtr client = std::make_shared<NetLinkClient>();// Create Netlink client
     PortToPidMapPtr portPidMap = std::make_shared<PortToPidMap>(); // Initialize the database of ports and pids
@@ -38,10 +41,12 @@ int main() {
 
     // subscribe to kernel module messages
     if (!client->sendMessage("daemon_subscribe")) {
-        std::cerr << "Failed to send message to kernel\n"; // logging
+        syslog(LOG_ERR, "Failed to send message to kernel");
         return -1;
     }
     
+    running = true;  // Force reinitialize in the child
+
     // Start the receiver thread, send const pointer to the client (recv is const)
     std::thread packetInfoListener(SharedUserFunctions::recvPacketInfoThread, NetLinkClientRecievePtr(client), messageQueue, std::ref(running));
 
@@ -55,7 +60,7 @@ int main() {
         }
         // A packet was received, update port-PID map
         if(portPidMap->addPidMapping(pckt->dst_port, pckt->proto)){// find the pid of the process using the port      
-            std::cout << "Port: " << pckt->dst_port << ", PID: " << portPidMap->getPid(pckt->dst_port) << " mapping added"<< std::endl;// logging
+            syslog(LOG_INFO, "Port: %u, PID: %d mapping added", pckt->dst_port, portPidMap->getPid(pckt->dst_port));
         }
     
         // Free the packet info structure
@@ -64,8 +69,8 @@ int main() {
     
     // Unsubscribe from kernel module and stop receiver thread
     if (!client->sendMessage("daemon_unsubscribe")) {
-    std::cerr << "Failed to send message to kernel\n";// logging
-    return -1;
+        syslog(LOG_ERR, "Failed to send message to kernel");
+        return -1;
     }
     packetInfoListener.join();
    
@@ -82,7 +87,7 @@ int main() {
     unixServer->stopListeningForNewClients();
     clientConnection.join();    
 
-    std::cout << "Port Monitor Daemon terminated" << std::endl; // logging
+    syslog(LOG_INFO, "Port Monitor Daemon terminated");
     return 0;
 }
 
@@ -91,13 +96,13 @@ void clientConnectionThread(PortToPidMapReadPtr portPidMap, UnixSocketServerPtr 
    
     while(running){   
         // waiting for client to connect
-        std::cout << "Waiting for client to connect"<< std::endl; // logging
+        syslog(LOG_INFO, "Waiting for client to connect");
         
         // Waiting for clients connection
         if(!unixServer->connectToClient()){// blocking call
             // Failed to connect
             if(running){// If The program wasnt ended
-                std::cout << "Client faild to connect"<<std::endl;// logging
+                syslog(LOG_WARNING, "Client failed to connect");
             }
             unixServer->closeClientFd();
             continue;
@@ -107,7 +112,7 @@ void clientConnectionThread(PortToPidMapReadPtr portPidMap, UnixSocketServerPtr 
         handleClientConnection(portPidMap, unixServer, running);// blocking call  
         
         // Remove the app from the connectedApps map
-        std::cout << "Client disconnected (fd=" << unixServer->getClientFd() << ")\n";// logging
+        syslog(LOG_INFO, "Client disconnected (fd=%d)", unixServer->getClientFd());
 
         // disconnect client to allow new one
         unixServer->closeClientFd();
@@ -128,13 +133,49 @@ void handleClientConnection(PortToPidMapReadPtr portPidMap, UnixSocketServerPtr 
         // Get the ports pid or nullptr if unknown and send to client
         pid = portPidMap->getPid(port);
         if(pid) {// send and logging
-            std::cout << "Client (fd=" << unixServer->getClientFd() << ") requested port " << port << ", sent PID: " << pid << "\n";// logging
+            syslog(LOG_INFO, "Client (fd=%d) requested port %u, sent PID: %d", unixServer->getClientFd(), port, pid);
             unixServer->sendPid(pid);
         } else {
-            std::cout << "Client (fd=" << unixServer->getClientFd() << ") requested port " << port << ",  sent PID: unknown\n";// logging
+            syslog(LOG_INFO, "Client (fd=%d) requested port %u,  sent PID: unknown", unixServer->getClientFd(), port);
             unixServer->sendPid(-1);// send -1 to client
         }
         
     }
+}
+
+void daemonize() {
+    pid_t pid = fork();
+    if (pid < 0) {
+        syslog(LOG_ERR, "Fork failed: %s", strerror(errno));
+        exit(EXIT_FAILURE);
+    }
+    if (pid > 0) {
+        // Parent exits
+        exit(EXIT_SUCCESS);
+    }
+
+    // Child becomes session leader, freeing it from terminal
+    if (setsid() < 0) {
+        syslog(LOG_ERR, "setsid failed: %s", strerror(errno));
+        exit(EXIT_FAILURE);
+    }
+
+    // second fork, to prevent aquiring terminal in the future
+    pid = fork();
+    if (pid < 0) {
+        syslog(LOG_ERR, "Second fork failed: %s", strerror(errno));
+        exit(EXIT_FAILURE);
+    }
+    if (pid > 0) {
+        exit(EXIT_SUCCESS);
+    }
+
+    // Change working directory, prevents the daemon to lock the dir it launched from
+    chdir("/");
+
+    // Redirect standard files to /dev/null
+    freopen("/dev/null", "r", stdin);
+    freopen("/dev/null", "w", stdout);
+    freopen("/dev/null", "w", stderr);
 }
 

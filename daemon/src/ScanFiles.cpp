@@ -154,8 +154,8 @@ namespace ScanFiles {
             for (const auto& socket : tcpSockets) {
                 inode = socket.first;
 
-                std::cout << "found tcp socket port " << socket.second << " for socket inode " << inode << std::endl;// logging
-
+                syslog(LOG_INFO, "found tcp socket port %u for socket inode %s", socket.second, inode.c_str());
+                
                 // Find the pid of the process using the socket inode, and update the map
                 pid = findPidBySockInode(inode);
                 return pid;
@@ -166,8 +166,8 @@ namespace ScanFiles {
             for (const auto& socket : udpSockets) {
                 inode = socket.first;
                 
-                std::cout << "found udp socket port " << socket.second << " for socket inode " << inode << std::endl;// logging
-
+                syslog(LOG_INFO, "found udp socket port %u for socket inode %s", socket.second, inode.c_str());
+                
                 // Find the pid of the process using the socket inode, and update the map
                 pid = findPidBySockInode(inode);
                 return pid;
