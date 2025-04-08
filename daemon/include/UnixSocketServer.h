@@ -14,7 +14,7 @@ public:
     bool start();
 
     // Stops the server from listening for new clients(closes client/server fds, unlinks socket path)
-    void stopListeningForNewClients() const;
+    void stopListeningForNewClients();
 
     // Send a message to the connected client
     bool sendPid(pid_t pid) const;
@@ -37,7 +37,8 @@ public:
     int getClientFd() const;
 
 private:
-    std::string socketPath;  // Path to the unix socket file, will be at /tmp/portmon_daemonApp.sock
-    int serverFd;            // File descriptor for listening socket
+    std::string socketPath;  // Path to the unix socket file
+    int serverFd; 
     int clientFd;
+    bool isShuttingDown; // Simple flag to prevent extra loggin when shutting down
 };

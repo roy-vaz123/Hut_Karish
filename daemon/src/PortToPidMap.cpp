@@ -5,8 +5,9 @@ PortToPidMap::PortToPidMap(){
     
     ScanFiles::initializePortPidMap(map);// Scan the files to fill map
     
+    std::cout << "Port Pid Mapping When Daemon Started: " << std::endl;// logging
     for(const auto& pair : map){// logging
-        std::cout << "port " << pair.first << " pid "<< pair.second << std::endl;
+        std::cout << "port " << pair.first << " pid "<< pair.second << std::endl;// logging
     }
     
 }

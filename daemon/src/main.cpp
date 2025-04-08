@@ -25,7 +25,8 @@ int main() {
 
     // Using syslog for logging, using log_daemon format, writes to /var/log/syslog app name portmon_daemon, print error to conlose
     openlog("portmon_daemon", LOG_PID | LOG_CONS, LOG_DAEMON);
-    
+    std::cout << "Activated Port Mon Daemon" << std::endl; // logging
+
     // Initilize the global variables
     NetLinkClientPtr client = std::make_shared<NetLinkClient>();// Create Netlink client
     PortToPidMapPtr portPidMap = std::make_shared<PortToPidMap>(); // Initialize the database of ports and pids
@@ -37,12 +38,12 @@ int main() {
 
     // subscribe to kernel module messages
     if (!client->sendMessage("daemon_subscribe")) {
-        std::cerr << "Failed to send message to kernel\n";
+        std::cerr << "Failed to send message to kernel\n"; // logging
         return -1;
     }
     
     // Start the receiver thread, send const pointer to the client (recv is const)
-    std::thread packetInfoListener(SharedUserFucntions::recvPacketInfoThread, NetLinkClientRecievePtr(client), messageQueue, std::ref(running));
+    std::thread packetInfoListener(SharedUserFunctions::recvPacketInfoThread, NetLinkClientRecievePtr(client), messageQueue, std::ref(running));
 
     // Main loop, poll the queue for messages
     while (running) {
@@ -54,21 +55,22 @@ int main() {
         }
         // A packet was received, update port-PID map
         if(portPidMap->addPidMapping(pckt->dst_port, pckt->proto)){// find the pid of the process using the port      
-                std::cout << "Port: " << pckt->dst_port << ", PID: " << portPidMap->getPid(pckt->dst_port) << " added to map"<< std::endl;// logging
+            std::cout << "Port: " << pckt->dst_port << ", PID: " << portPidMap->getPid(pckt->dst_port) << " mapping added"<< std::endl;// logging
         }
+    
         // Free the packet info structure
         client->freePacketInfo(pckt);// free the allocated memory for the message
     }
     
     // Unsubscribe from kernel module and stop receiver thread
     if (!client->sendMessage("daemon_unsubscribe")) {
-    std::cerr << "Failed to send message to kernel\n";// switch to log
+    std::cerr << "Failed to send message to kernel\n";// logging
     return -1;
     }
     packetInfoListener.join();
    
     // Free remainig messages in message queue
-    SharedUserFucntions::cleanMessageQueue(messageQueue, client);
+    SharedUserFunctions::cleanMessageQueue(messageQueue, client);
     
     // Close active connection if conncected 
     if(unixServer->getClientFd() > 0){
@@ -84,13 +86,12 @@ int main() {
     return 0;
 }
 
-
 // The thread for connected app, wait for messages containing ports and returns pid from the port pid map 
 void clientConnectionThread(PortToPidMapReadPtr portPidMap, UnixSocketServerPtr unixServer, std::atomic<bool>& running) {
    
     while(running){   
         // waiting for client to connect
-        std::cout << "Waiting for client to connect"<< std::endl;
+        std::cout << "Waiting for client to connect"<< std::endl; // logging
         
         // Waiting for clients connection
         if(!unixServer->connectToClient()){// blocking call
@@ -127,10 +128,10 @@ void handleClientConnection(PortToPidMapReadPtr portPidMap, UnixSocketServerPtr 
         // Get the ports pid or nullptr if unknown and send to client
         pid = portPidMap->getPid(port);
         if(pid) {// send and logging
-            std::cout << "Client (fd=" << unixServer->getClientFd() << ") requested port " << port << ", PID: " << pid << "\n";// logging
+            std::cout << "Client (fd=" << unixServer->getClientFd() << ") requested port " << port << ", sent PID: " << pid << "\n";// logging
             unixServer->sendPid(pid);
         } else {
-            std::cout << "Client (fd=" << unixServer->getClientFd() << ") requested port " << port << ", PID: unknown\n";// logging
+            std::cout << "Client (fd=" << unixServer->getClientFd() << ") requested port " << port << ",  sent PID: unknown\n";// logging
             unixServer->sendPid(-1);// send -1 to client
         }
         

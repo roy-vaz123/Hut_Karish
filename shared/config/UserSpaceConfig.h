@@ -26,7 +26,7 @@ static void handleSignal(int signum) {
 }
 
 // functions shared between packet_hunter and daemon
-namespace SharedUserFucntions{
+namespace SharedUserFunctions{
     // The thread thall listen and receive messages from the kernel module
     static void recvPacketInfoThread(NetLinkClientRecievePtr client, MessageQueuePtr messageQueue, std::atomic<bool>& running) {
         while (running) {

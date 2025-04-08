@@ -28,7 +28,7 @@ int main() {
     }
     
     // Start the receiver thread, std::ref meeded to pass reference to thread 
-    std::thread packetsListener(SharedUserFucntions::recvPacketInfoThread, NetLinkClientRecievePtr(netLinkClient), messageQueue, std::ref(running));
+    std::thread packetsListener(SharedUserFunctions::recvPacketInfoThread, NetLinkClientRecievePtr(netLinkClient), messageQueue, std::ref(running));
 
     // Main loop: poll the queue for messages
     while (running) {
@@ -71,7 +71,7 @@ int main() {
     packetsListener.join();
  
     // Free all stored packets in messages queue
-    SharedUserFucntions::cleanMessageQueue(messageQueue, netLinkClient);
+    SharedUserFunctions::cleanMessageQueue(messageQueue, netLinkClient);
 
     // Free all stored packets in the map
     for (const auto& pair : pidToPcktMap.getMap()) {

@@ -87,7 +87,7 @@ int UnixSocketServer::getServerFd() const{
 // Wait for client connection and connect
 bool UnixSocketServer::connectToClient(){
     clientFd = accept(serverFd, nullptr, nullptr);// blocking waiting for the app to connect to daemon using socket accept
-    if (clientFd < 0) {
+    if (clientFd < 0 || isShuttingDown) {
         return false;// Failed to connecto to client
     }
     std::cout << "Client connected (fd=" << clientFd << ")\n";// logging
@@ -108,7 +108,8 @@ void UnixSocketServer::closeClientFd(){
 
 // Stops the server from listening for new clients(closes client/server fds, unlinks socket path)
 // by sending a fake empty connection to break the accept block
-void UnixSocketServer::stopListeningForNewClients() const{
+void UnixSocketServer::stopListeningForNewClients(){
+    this->isShuttingDown = true;
     int tmpSock = socket(AF_UNIX, SOCK_STREAM, 0);// Opens temporary socket for dummy connection
     if (tmpSock >= 0) {
         // initilize socket to simulate client
