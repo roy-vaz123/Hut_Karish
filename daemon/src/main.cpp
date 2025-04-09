@@ -1,178 +1,181 @@
-
-#include "AppThreadsMap.h"// for the connected apps threads
-#include "ScanFiles.h"// for scanning the files for the pids
+#include "PortToPidMap.h"// The map that will keep the pid for packets ports
 #include "UserSpaceConfig.h"// for useful headers and shared ptrs
 #include "UnixSocketServer.h" 
 #include <unistd.h> // files functions (close, unlink, read, write)
 #include <sys/socket.h> // for socket functions like accept
 #include <syslog.h>// for log (no cout for daemons)
-#include <iostream>
 
 
 // Shared pointers to share data through threads, safe to use end easier to manage the global vars
-using PortToPidMapReadPtr = std::shared_ptr<const ThreadSafeUnorderedMap<uint16_t, pid_t>>;// for the port to pid map
-using PortToPidMapPtr = std::shared_ptr<ThreadSafeUnorderedMap<uint16_t, pid_t>>;// for the port to pid map
-using UnixSocketServerPtr = std::shared_ptr<const UnixSocketServer>;
-using ConnectedAppsMapPtr = std::shared_ptr<AppThreadsMap>;// for the connected apps threads
+using PortToPidMapReadPtr = std::shared_ptr<const PortToPidMap>;// for the port to pid map
+using PortToPidMapPtr = std::shared_ptr<PortToPidMap>;// for the port to pid map
+using UnixSocketServerPtr = std::shared_ptr<UnixSocketServer>;
 
-// Runs on a seperate thread, insert new clients connecting to the connectedApps map
-void acceptAppConnectionThread(UnixSocketServerPtr appsCommServer, PortToPidMapReadPtr portPidMap, ConnectedAppsMapPtr connectedApps);
 
-// The thread for connected app, wait for messages containing ports and returns pid from the port pid map 
-void appConnectionThread(int clientFd, UnixSocketServerPtr appsCommServer, PortToPidMapReadPtr portPidMap, ConnectedAppsMapPtr connectedApps);
+// The thread for the client (packet hunter) daemon communication (using unix dumain socket), wait for client to connect, then listen for messages from client
+void clientConnectionThread(PortToPidMapReadPtr portPidMap, UnixSocketServerPtr unixServer, std::atomic<bool>& running);
 
-// The thread thall listen and receive messages from the kernel module
-void recvPacketInfoThread(NetLinkClientRecievePtr client, MessageQueuePtr messageQueue);
-
-// Return pid of port from map or -1 if not found
-pid_t getPidByPort(uint16_t port, PortToPidMapReadPtr portPidMap);
-
-// Update the port pid map with the new pid, return false if falis to find pid in files
-bool updatePortPidMap(uint16_t port, PortToPidMapPtr portPidMap, char packetProtocol);
+// Listen to client and answer
+void handleClientConnection(PortToPidMapReadPtr portPidMap, UnixSocketServerPtr unixServer,std::atomic<bool>& running);
 
 int main() {
     
+    // Capture signals to end the program
+    std::signal(SIGINT, handleSignal); // For Ctrl+C
+    std::signal(SIGTERM, handleSignal);// For terminate (will be sent from main menu script) 
+
+    
     // Using syslog for logging, using log_daemon format, writes to /var/log/syslog app name portmon_daemon, print error to conlose
     openlog("portmon_daemon", LOG_PID | LOG_CONS, LOG_DAEMON);
-    
+ 
+    syslog(LOG_INFO, "Activated Port Monitor Terminal");
+ 
     // Initilize the global variables
     NetLinkClientPtr client = std::make_shared<NetLinkClient>();// Create Netlink client
-    PortToPidMapPtr portPidMap = std::make_shared<ThreadSafeUnorderedMap<uint16_t, pid_t>>(); // Initialize the database of ports and PIDs
-    ScanFiles::initializePortPidMap(*portPidMap);// Scan the system files to find the PIDs of the processes using the ports
-    UnixSocketServerPtr appsCommServer = std::make_shared<UnixSocketServer>(SOCKET_FILE_ADRESS);// Create the Unix socket server to bind with sock file adress
+    PortToPidMapPtr portPidMap = std::make_shared<PortToPidMap>(); // Initialize the database of ports and pids
     MessageQueuePtr messageQueue = std::make_shared<MessageQueue>();// Create the message queue
-    ConnectedAppsMapPtr connectedApps = std::make_shared<AppThreadsMap>();// Map of connected apps and their threads
-    
+    UnixSocketServerPtr unixServer = std::make_shared<UnixSocketServer>();// initilize the server
     
     // start the thread that listen to new apps and connect them to daemon
-    std::thread appClientConnectionListener(acceptAppConnectionThread, appsCommServer, portPidMap, connectedApps);
+    std::thread clientConnection(clientConnectionThread, portPidMap, unixServer, std::ref(running));
 
-    for(const auto& pair : portPidMap->getMap()){// logging
-        std::cout << "port " << pair.first << " pid "<< pair.second << std::endl;
-    }
-    
     // subscribe to kernel module messages
     if (!client->sendMessage("daemon_subscribe")) {
-        std::cerr << "Failed to send message to kernel\n";
+        syslog(LOG_ERR, "Failed to send message to kernel");
         return -1;
     }
     
-    // Start the receiver thread, send const pointer to the client (recv is const)
-    std::thread packetInfoListener(recvPacketInfoThread, NetLinkClientRecievePtr(client), messageQueue);
+    running = true;  // Force reinitialize in the child
 
-    // Main loop: poll the queue for messages
-    while (true) {
+    // Start the receiver thread, send const pointer to the client (recv is const)
+    std::thread packetInfoListener(SharedUserFunctions::recvPacketInfoThread, NetLinkClientRecievePtr(client), messageQueue, std::ref(running));
+
+    // Main loop, poll the queue for messages
+    while (running) {
         const pckt_info* pckt = messageQueue->pop();
         if (!pckt) {
             // If queue is empty, wait a bit before checking again (avoid busy looping)
-            std::this_thread::sleep_for(std::chrono::milliseconds(1));
+            std::this_thread::sleep_for(std::chrono::milliseconds(5));
             continue;
         }
-        // A packet was received, update port-PID map if necceccary
-        if(getPidByPort(pckt->dst_port, portPidMap) == -1) {
-            if(updatePortPidMap(pckt->dst_port, portPidMap, pckt->proto)){// find the pid of the process using the port
-               
-                std::cout << "Port: " << pckt->dst_port << ", PID: " << *(portPidMap->get(pckt->dst_port)) << " added to map"<< std::endl;// logging
-            }
+        // A packet was received, update port-PID map
+        if(portPidMap->addPidMapping(pckt->dst_port, pckt->proto)){// find the pid of the process using the port      
+            syslog(LOG_INFO, "Port: %u, PID: %d mapping added", pckt->dst_port, portPidMap->getPid(pckt->dst_port));
         }
+    
         // Free the packet info structure
         client->freePacketInfo(pckt);// free the allocated memory for the message
     }
-
-    // Stop receiver thread
-    packetInfoListener.join();
-
-    // Unsubscribe from kernel module messages
+    
+    // Unsubscribe from kernel module and stop receiver thread
     if (!client->sendMessage("daemon_unsubscribe")) {
-        std::cerr << "Failed to send message to kernel\n";// switch to log
+        syslog(LOG_ERR, "Failed to send message to kernel");
         return -1;
     }
+    packetInfoListener.join();
+   
+    // Free remainig messages in message queue
+    SharedUserFunctions::cleanMessageQueue(messageQueue, client);
     
-    // Free all remaing packets in the message queue
-    while (!messageQueue->empty()){
-        const pckt_info* pckt = messageQueue->pop();
-        if (pckt) {
-            client->freePacketInfo(pckt);// free the allocated memory for the message
-        }
+    // Close active connection if conncected 
+    if(unixServer->getClientFd() > 0){
+        shutdown(unixServer->getClientFd(), SHUT_RD);
+        unixServer->closeClientFd();
     }
-
-    // Join all connected app threads for clean clousure
-    connectedApps->joinAll();
-    appClientConnectionListener.join();// join the app connection listener thread
     
+    // Close server socket and join the app client connection thread
+    unixServer->stopListeningForNewClients();
+    clientConnection.join();    
+
+    syslog(LOG_INFO, "Port Monitor Daemon terminated");
     return 0;
 }
 
-// The thread thall listen and receive messages from the kernel module
-void recvPacketInfoThread(NetLinkClientRecievePtr client, MessageQueuePtr messageQueue) {
-    while (true) {
-        const pckt_info* pckt = client->receivePacketInfo();// allocate memory for the packet!!!!!
-        if (pckt) {
-            messageQueue->push(pckt);
-        }
-    }
-}
-
 // The thread for connected app, wait for messages containing ports and returns pid from the port pid map 
-void appConnectionThread(int clientFd, UnixSocketServerPtr appsCommServer, PortToPidMapReadPtr portPidMap, ConnectedAppsMapPtr connectedApps) {
-    uint16_t port;
-    const pid_t* pid;
-    while (true) {
-        if(!appsCommServer->receivePort(clientFd, port)) break;// blocking, waiting to recieve message from client
+void clientConnectionThread(PortToPidMapReadPtr portPidMap, UnixSocketServerPtr unixServer, std::atomic<bool>& running) {
+   
+    while(running){   
+        // waiting for client to connect
+        syslog(LOG_INFO, "Waiting for client to connect");
         
-        // Get the ports pid or nullptr if unknown and send to client
-        pid = portPidMap->get(port);
-        if(pid) {// send and logging
-            std::cout << "Client (fd=" << clientFd << ") requested port " << port << ", PID: " << *pid << "\n";// logging
-            appsCommServer->sendPid(clientFd, *pid);
-        } else {
-            std::cout << "Client (fd=" << clientFd << ") requested port " << port << ", PID: unknown\n";// logging
-            appsCommServer->sendPid(clientFd, -1);// send -1 to client
-        }
-        
-    }
-
-    close(clientFd);
-
-    // Remove the app from the connectedApps map
-    connectedApps->erase(clientFd);// the app disconnected, remove it from the map
-    std::cout << "Client disconnected (fd=" << clientFd << ")\n";// logging
-}
-
-// Runs on a seperate thread, insert new clients connecting to the connectedApps map
-void acceptAppConnectionThread(UnixSocketServerPtr appsCommServer, PortToPidMapReadPtr portPidMap, ConnectedAppsMapPtr connectedApps) {
-    int serverFd = appsCommServer->getServerFd();
-    while (true) {
-        int clientFd = accept(serverFd, nullptr, nullptr);// blocking waiting for new apps to connect to daemon
-        if (clientFd < 0) {
-            perror("accept");
+        // Waiting for clients connection
+        if(!unixServer->connectToClient()){// blocking call
+            // Failed to connect
+            if(running){// If The program wasnt ended
+                syslog(LOG_WARNING, "Client failed to connect");
+            }
+            unixServer->closeClientFd();
             continue;
         }
+        
+        // Client connected succecssfully, listen to client and answer
+        handleClientConnection(portPidMap, unixServer, running);// blocking call  
+        
+        // Remove the app from the connectedApps map
+        syslog(LOG_INFO, "Client disconnected (fd=%d)", unixServer->getClientFd());
 
-        std::cout << "Client connected (fd=" << clientFd << ")\n";// logging
-        // create a new thread for the connected app
-        connectedApps->insertAppThread(clientFd, std::thread(appConnectionThread, clientFd, appsCommServer, portPidMap, connectedApps));
-    }
-}
-
-// Return pid of port from map or -1 if not found
-pid_t getPidByPort(uint16_t port, PortToPidMapReadPtr portPidMap){
-    const pid_t* pid = portPidMap->get(port);
-    if (pid) {
-        return *pid;
-    }
-    return -1; // not found
-}
-
-// Update the port pid map with the new pid, return false if falis to find pid in files
-bool updatePortPidMap(uint16_t port, PortToPidMapPtr portPidMap, char packetProtocol) {
-    pid_t pid = ScanFiles::scanForPidByPort(port, packetProtocol);// find the pid of the process using the port
-    if(pid == -1) {
-        std::cerr << "Failed to find PID for port " << port <<" packet type: "<< packetProtocol << std::endl;
-        return false; // failed to find pid
+        // disconnect client to allow new one
+        unixServer->closeClientFd();
     }
     
-    // update the port pid map with the new pid from files 
-    portPidMap->insertOrAssign(port, pid);
-    return true;
 }
+
+// Listen to client and answer
+void handleClientConnection(PortToPidMapReadPtr portPidMap, UnixSocketServerPtr unixServer,std::atomic<bool>& running){
+    if (unixServer->getClientFd() < 0) return; // if connection somehow isnt valid
+    
+    // Listen to client and and answer its port requests
+    uint16_t port;
+    pid_t pid;
+    while (running) {// On stopping main will close client fd, recieve port will break loop
+        if(!unixServer->receivePort(port)) break;// blocking, waiting to recieve message from client
+        
+        // Get the ports pid or nullptr if unknown and send to client
+        pid = portPidMap->getPid(port);
+        if(pid) {// send and logging
+            syslog(LOG_INFO, "Client (fd=%d) requested port %u, sent PID: %d", unixServer->getClientFd(), port, pid);
+            unixServer->sendPid(pid);
+        } else {
+            syslog(LOG_INFO, "Client (fd=%d) requested port %u,  sent PID: unknown", unixServer->getClientFd(), port);
+            unixServer->sendPid(-1);// send -1 to client
+        }
+        
+    }
+}
+
+void daemonize() {
+    pid_t pid = fork();
+    if (pid < 0) {
+        syslog(LOG_ERR, "Fork failed: %s", strerror(errno));
+        exit(EXIT_FAILURE);
+    }
+    if (pid > 0) {
+        // Parent exits
+        exit(EXIT_SUCCESS);
+    }
+
+    // Child becomes session leader, freeing it from terminal
+    if (setsid() < 0) {
+        syslog(LOG_ERR, "setsid failed: %s", strerror(errno));
+        exit(EXIT_FAILURE);
+    }
+
+    // second fork, to prevent aquiring terminal in the future
+    pid = fork();
+    if (pid < 0) {
+        syslog(LOG_ERR, "Second fork failed: %s", strerror(errno));
+        exit(EXIT_FAILURE);
+    }
+    if (pid > 0) {
+        exit(EXIT_SUCCESS);
+    }
+
+    // Change working directory, prevents the daemon to lock the dir it launched from
+    chdir("/");
+
+    // Redirect standard files to /dev/null
+    freopen("/dev/null", "r", stdin);
+    freopen("/dev/null", "w", stdout);
+    freopen("/dev/null", "w", stderr);
+}
+

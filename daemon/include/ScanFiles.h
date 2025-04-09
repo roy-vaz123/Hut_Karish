@@ -1,9 +1,11 @@
 #pragma once
 
-#include <ThreadSafeUnorderedMap.h>// for initilize the port-pid map
+#include <unordered_map> // for initilize the port-pid map
 #include <sys/types.h>
 #include <cstdint>
 #include <memory>// for shared vars (multiple threads)
+#include <syslog.h> // added for syslog
+
 
 // Functions use to scan the system files, to find the PID of the process that is using a specific port
 // well do that by first, find the inode of the socket using that port and then find the PID of the process using that inode
@@ -11,7 +13,7 @@
 // go over all of every process socket and check if its port matches the one we are looking for
 namespace ScanFiles {
     // Full scan on startup
-    void initializePortPidMap(ThreadSafeUnorderedMap<uint16_t, pid_t>& map);
+    void initializePortPidMap(std::unordered_map<uint16_t, pid_t>& map);
 
     // Find port linked pid if its not already in the map
     pid_t scanForPidByPort(uint16_t port, char packetProtocol);

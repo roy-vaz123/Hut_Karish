@@ -10,7 +10,8 @@ typedef __u16 uint16_t;
 #else
 
 // only for user-space
-#include <stdint.h>        
+#include <stdint.h> 
+#include <sys/types.h>       
 
 #endif
 

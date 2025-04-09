@@ -14,10 +14,12 @@ public:
     bool sendMessage(const std::string& msg);   // send string to kernel
     
     // receive packets info from kernel (for now also interpret it, see explenation on the considerations
-    // and alternative approach in the implementaion of this function)
+    // and alternative packet_hunterroach in the implementaion of this function)
     const pckt_info* receivePacketInfo() const;  
     void freePacketInfo(const pckt_info* pckt) const; // free the packet info structure, the same allocator that allocated the memory (extra safety)
     
+    // Shutdown netlink client
+    void shutDownClient();
 
 private:
     int sock_fd;                  // socket file descriptor

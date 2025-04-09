@@ -10,7 +10,6 @@ bool comparePacketInfo(const pckt_info* a, const pckt_info* b) {
 
 // Finds if packet already exists in the map, to avoid unnecessary insertions and daemon requests
 bool PidToPacketsInfoMap::containsPacket(const pckt_info* newPacket) const{
-    std::shared_lock<std::shared_mutex> lock(mtx); // Lock for reading the map
     // Iterate through the map
     for (const auto& pair : this->map) {
         for(const auto& packet : pair.second) {
@@ -27,7 +26,6 @@ bool PidToPacketsInfoMap::containsPacket(const pckt_info* newPacket) const{
 void PidToPacketsInfoMap::insertPacketInfo(pid_t pid, const pckt_info* newPacket) {
     if(pid == -1) return; // Dont insert packets with unknown pid
     
-    std::unique_lock<std::shared_mutex> lock(mtx); // Lock for changing the map
     // If the pid is not in the map, create a new vector for it
     if(this->map.find(pid) == this->map.end()) {
         this->map[pid] = std::vector<const pckt_info*>();
@@ -35,4 +33,7 @@ void PidToPacketsInfoMap::insertPacketInfo(pid_t pid, const pckt_info* newPacket
     this->map[pid].push_back(newPacket);// Add the packet info to the vector of that pid
 }
 
-
+// Returns a const ref to the map
+const pidToPcktMap& PidToPacketsInfoMap::getMap() const{
+    return map;
+}

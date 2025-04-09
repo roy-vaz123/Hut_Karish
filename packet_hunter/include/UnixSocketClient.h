@@ -7,8 +7,10 @@
 // It connects to a UNIX socket, sends port numbers, and receives PIDs in response.
 class UnixSocketClient {
 public:
-    // Constructor: takes path to the UNIX socket file (e.g., /tmp/portmon_daemonApp.sock)
+    // Ctor inilialize Unix clint socket, and connect to server
     UnixSocketClient();
+    
+    // Disconnect from server on destruction
     ~UnixSocketClient();
 
     // Connects to the daemon server
@@ -25,6 +27,9 @@ public:
 
     // Returns the socket file descriptor
     int getSocketFd() const;
+
+    // Check if daemon still alive 
+    bool isServerAlive() const;
 
 private:
     std::string socketPath; // Path to the socket

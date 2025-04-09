@@ -42,15 +42,14 @@ NetLinkClient::NetLinkClient() {
 NetLinkClient::~NetLinkClient() {
     if (sock_fd != -1) {
         close(sock_fd);
+        sock_fd = -1;
     }
 }
 
 // Sends a string message to the kernel
 bool NetLinkClient::sendMessage(const std::string& msg) {
     if (sock_fd < 0) return false;// The socket is not created or bound
-
-    std::cout << "Sending message to kernel: " << msg << std::endl;
-
+    
     // Allocate memory for the Netlink message (header + payload) static_cast for type safety
     nlmsghdr* nlh = static_cast<nlmsghdr*>(malloc(NLMSG_SPACE(MAX_PAYLOAD)));
     if (!nlh) return false;
@@ -95,7 +94,7 @@ const pckt_info* NetLinkClient::receivePacketInfo() const {
     char buffer[MAX_PAYLOAD];
     struct nlmsghdr* nlh = reinterpret_cast<struct nlmsghdr*>(buffer);
 
-    int len = recv(sock_fd, nlh, MAX_PAYLOAD, 0);
+    int len = recv(sock_fd, nlh, MAX_PAYLOAD, 0);// blocking call
     if (len < 0) {
         perror("recv");
         return nullptr;

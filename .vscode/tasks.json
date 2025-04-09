@@ -16,7 +16,7 @@
         "command": "make",
         "dependsOn": ["Build Shared"],
         "options": {
-          "cwd": "${workspaceFolder}/app"
+          "cwd": "${workspaceFolder}/packet_hunter"
         },
         "group": "build"
       },

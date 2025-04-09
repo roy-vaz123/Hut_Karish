@@ -33,13 +33,31 @@ static struct nf_hook_ops nfho;  // Netfilter hook options struct
 struct sock *nl_sk = NULL; // Netlink socket struct, used to send messages to user space
 
 // Netlink clients subscribed to the kernel module, and thir PIDs
-static int app_subscribed = 0;
+static int packet_hunter_subscribed = 0;
 static int daemon_subscribed = 0;
-static u32 app_pid = 0;
+static u32 packet_hunter_pid = 0;
 static u32 daemon_pid = 0;
 
 
 
+// Creat pckt info struct to send based of data from hook
+static struct pckt_info* create_message( u32 src_ip, u32 dst_ip, u16 src_port, u16 dst_port, char proto) {
+    struct pckt_info *msg = kmalloc(sizeof(*msg), GFP_ATOMIC);
+    if (!msg) {
+        pr_err("sniffer: Failed to allocate memory for packet info\n");
+        return NULL;
+    }
+
+    // Fill the packet info struct with the packet's info
+    msg->src_ip = src_ip;
+    msg->dst_ip = dst_ip;
+    msg->src_port = src_port;
+    msg->dst_port = dst_port;
+    msg->proto = proto;
+
+    return msg;
+    
+}
 
 // Sends a single pckt_info struct to a client using Netlink
 static void send_packet_info_to_user(u32 pid, const struct pckt_info *msg) {
@@ -73,6 +91,13 @@ static void send_packet_info_to_user(u32 pid, const struct pckt_info *msg) {
     }
 }
 
+// Create and send stop message, tells users to stop listening
+void send_stop_msg(u32 pid){
+    struct pckt_info* msg = create_message(0, 0, 0, 0, 0);// send empty packet to user to let make it terminate (simplest solution i found to free recv block)
+    send_packet_info_to_user(pid, msg);
+    kfree(msg);   
+}
+
 // Netlink Receive function (called when a message is received from user space) to subscribe/unsubscribe
 static void nl_recv_msg(struct sk_buff *skb)
 {
@@ -94,20 +119,21 @@ static void nl_recv_msg(struct sk_buff *skb)
     pr_info("sniffer: received netlink message: %s\n", user_msg);
 
     // Subscribe/unsubscribe netlink cliets according to messages (to the sender proccess)
-    if (strcmp(user_msg, "app_subscribe") == 0) {
-        app_subscribed = 1;
-        app_pid = nlh->nlmsg_pid; // Get the PID of the sender process
-        pr_info("sniffer: app_subscribed to packet notifications from PID: %u\n", app_pid);
+    if (strcmp(user_msg, "packet_hunter_subscribe") == 0 && packet_hunter_subscribed == 0) {
+        packet_hunter_subscribed = 1;
+        packet_hunter_pid = nlh->nlmsg_pid; // Get the PID of the sender process
+        pr_info("sniffer: packet_hunter_subscribed to packet notifications from PID: %u\n", packet_hunter_pid);
         return;
 
     }
-    if(strcmp(user_msg, "app_unsubscribe") == 0){
-        app_subscribed = 0;
-        app_pid = 0;
-        pr_info("sniffer: Unapp_subscribed from packet notifications\n");
+    if(strcmp(user_msg, "packet_hunter_unsubscribe") == 0){
+        send_stop_msg(packet_hunter_pid); // Tells the user to stop listen 
+        packet_hunter_subscribed = 0;
+        packet_hunter_pid = 0;
+        pr_info("sniffer: packet_hunter unsubscribed from packet notifications\n");
         return;   
     }
-    if (strcmp(user_msg, "daemon_subscribe") == 0) {
+    if (strcmp(user_msg, "daemon_subscribe") == 0 && daemon_subscribed == 0) {
         daemon_subscribed = 1;
         daemon_pid = nlh->nlmsg_pid; // Get the PID of the sender process
         pr_info("sniffer: daemon_subscribed to packet notifications from PID: %u\n", daemon_pid);
@@ -115,9 +141,10 @@ static void nl_recv_msg(struct sk_buff *skb)
 
     }
     if(strcmp(user_msg, "daemon_unsubscribe") == 0){
+        send_stop_msg(daemon_pid); // Tells the user to stop listen
         daemon_subscribed = 0;
         daemon_pid = 0;
-        pr_info("sniffer: Unsubscribed from packet notifications\n");
+        pr_info("sniffer: daemon nsubscribed from packet notifications\n");
         return;
 
     }
@@ -125,24 +152,6 @@ static void nl_recv_msg(struct sk_buff *skb)
     
 }
 
-// Creat pckt info struct to send based of data from hook
-static struct pckt_info* create_message( u32 src_ip, u32 dst_ip, u16 src_port, u16 dst_port, char proto) {
-    struct pckt_info *msg = kmalloc(sizeof(*msg), GFP_ATOMIC);
-    if (!msg) {
-        pr_err("sniffer: Failed to allocate memory for packet info\n");
-        return NULL;
-    }
-
-    // Fill the packet info struct with the packet's info
-    msg->src_ip = src_ip;
-    msg->dst_ip = dst_ip;
-    msg->src_port = src_port;
-    msg->dst_port = dst_port;
-    msg->proto = proto;
-
-    return msg;
-    
-}
 
 // Retrive ip header from a packet in the socket buffer and pr_info the packet cought
 static unsigned int packet_sniffer_hook(void *priv, struct sk_buff *skb, const struct nf_hook_state *state){
@@ -215,16 +224,16 @@ static unsigned int packet_sniffer_hook(void *priv, struct sk_buff *skb, const s
         pr_info("[sniffer] Packet info sent to user process PID: %u\n", daemon_pid);
     }
     
-    // If the app is subscribed, create and send the packet's info to the app pid
-    if (app_subscribed && app_pid != 0) {           
+    // If the packet_hunter is subscribed, create and send the packet's info to the packet_hunter pid
+    if (packet_hunter_subscribed && packet_hunter_pid != 0) {           
         msg = create_message(src_ip, dst_ip, src_port, dst_port, proto);
         if (!msg)
             return NF_ACCEPT;
         
         // Send the packet info to the user process
-        send_packet_info_to_user(app_pid, msg);
+        send_packet_info_to_user(packet_hunter_pid, msg);
         kfree(msg);
-        pr_info("[sniffer] Packet info sent to user process PID: %u\n", app_pid);
+        pr_info("[sniffer] Packet info sent to user process PID: %u\n", packet_hunter_pid);
     }
     
 
