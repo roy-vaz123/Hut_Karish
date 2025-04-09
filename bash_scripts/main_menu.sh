@@ -42,9 +42,10 @@ function stop_daemon() {
     fi
 }
 
-# Start the packet hunter in a new terminal
+# Start the packet hunter in the same terminal
 function start_packetHunter() {
-    if gnome-terminal -- bash -c "$APP_EXEC; exec bash" &>/dev/null; then
+    clear 
+    if $APP_EXEC; then 
         LAST_CMD="Started Packet Hunter"
     else
         LAST_CMD="Error: Failed to start Packet Hunter"
@@ -73,9 +74,9 @@ function show_menu() {
     echo "2. Unload Kernel Module"
     echo "3. Start Daemon"
     echo "4. Stop Daemon"
-    echo "5. Start PacketHunter (client)"
-    echo "6. Tail dmesg (kernel module output)"
-    echo "7. View Daemon Logs"
+    echo "5. Start the Packet Hunter (ctrl C to stop)"
+    echo "6. View Kernel Module Output (ctrl C to stop)"
+    echo "7. View Daemon Logs (ctrl C to stop)"
     echo "8. Exit"
     echo "======================================="
     echo
