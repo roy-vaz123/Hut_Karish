@@ -112,6 +112,7 @@ This avoids scanning thousands of directories needlessly and reflects realistic 
 
 - **Not production-ready**: Built for learning, not for reliability or performance.
 - **Port-to-PID mappings are volatile**:
+  - Saving these mapping is maeningless since ports pid mapping are subject to change (saw alot of examples from the daemon logging)
   - Processes may terminate between packet capture and resolution.
   - Short-lived connections are missed entirely.
 
