@@ -120,8 +120,6 @@ void printPacketInfo(const pckt_info* pckt, pid_t pid) {
     }
 }
 
-
-
 // Ask user to save the packet map and write it to a file (default: hut_karish/packets.log)
 void savePacketMapToFile(const PidToPacketsInfoMap& pidToPcktMap, NetLinkClientRecievePtr client) {
     // This gives you the actual directory where the binary lives, so save log in project folder

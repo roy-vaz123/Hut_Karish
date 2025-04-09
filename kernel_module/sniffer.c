@@ -59,7 +59,6 @@ static struct pckt_info* create_message( u32 src_ip, u32 dst_ip, u16 src_port, u
     
 }
 
-
 // Sends a single pckt_info struct to a client using Netlink
 static void send_packet_info_to_user(u32 pid, const struct pckt_info *msg) {
     
@@ -120,7 +119,7 @@ static void nl_recv_msg(struct sk_buff *skb)
     pr_info("sniffer: received netlink message: %s\n", user_msg);
 
     // Subscribe/unsubscribe netlink cliets according to messages (to the sender proccess)
-    if (strcmp(user_msg, "packet_hunter_subscribe") == 0) {
+    if (strcmp(user_msg, "packet_hunter_subscribe") == 0 && packet_hunter_subscribed == 0) {
         packet_hunter_subscribed = 1;
         packet_hunter_pid = nlh->nlmsg_pid; // Get the PID of the sender process
         pr_info("sniffer: packet_hunter_subscribed to packet notifications from PID: %u\n", packet_hunter_pid);
@@ -134,7 +133,7 @@ static void nl_recv_msg(struct sk_buff *skb)
         pr_info("sniffer: packet_hunter unsubscribed from packet notifications\n");
         return;   
     }
-    if (strcmp(user_msg, "daemon_subscribe") == 0) {
+    if (strcmp(user_msg, "daemon_subscribe") == 0 && daemon_subscribed == 0) {
         daemon_subscribed = 1;
         daemon_pid = nlh->nlmsg_pid; // Get the PID of the sender process
         pr_info("sniffer: daemon_subscribed to packet notifications from PID: %u\n", daemon_pid);

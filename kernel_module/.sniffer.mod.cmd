@@ -1,1 +1,0 @@
-cmd_/home/roy/projects/hut_karish/kernel_module/sniffer.mod := printf '%s\n'   sniffer.o | awk '!x[$$0]++ { print("/home/roy/projects/hut_karish/kernel_module/"$$0) }' > /home/roy/projects/hut_karish/kernel_module/sniffer.mod
