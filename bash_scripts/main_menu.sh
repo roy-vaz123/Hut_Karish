@@ -1,5 +1,6 @@
 #!/bin/bash
 
+cd ~/projects/hut_karish
 KERNEL_MODULE="build/kernel_module/sniffer.ko"
 DAEMON_SERVICE="portmon_daemon"
 APP_EXEC="sudo ./build/packet_hunter/packet_hunter"

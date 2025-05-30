@@ -1,1 +1,8 @@
-
+# Compiled objects and kernel modules
+*.ko
+*.o
+*.mod
+*.mod.c
+*.mod.o
+*.order
+*.symvers

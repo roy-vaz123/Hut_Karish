@@ -143,39 +143,5 @@ void handleClientConnection(PortToPidMapReadPtr portPidMap, UnixSocketServerPtr 
     }
 }
 
-void daemonize() {
-    pid_t pid = fork();
-    if (pid < 0) {
-        syslog(LOG_ERR, "Fork failed: %s", strerror(errno));
-        exit(EXIT_FAILURE);
-    }
-    if (pid > 0) {
-        // Parent exits
-        exit(EXIT_SUCCESS);
-    }
 
-    // Child becomes session leader, freeing it from terminal
-    if (setsid() < 0) {
-        syslog(LOG_ERR, "setsid failed: %s", strerror(errno));
-        exit(EXIT_FAILURE);
-    }
-
-    // second fork, to prevent aquiring terminal in the future
-    pid = fork();
-    if (pid < 0) {
-        syslog(LOG_ERR, "Second fork failed: %s", strerror(errno));
-        exit(EXIT_FAILURE);
-    }
-    if (pid > 0) {
-        exit(EXIT_SUCCESS);
-    }
-
-    // Change working directory, prevents the daemon to lock the dir it launched from
-    chdir("/");
-
-    // Redirect standard files to /dev/null
-    freopen("/dev/null", "r", stdin);
-    freopen("/dev/null", "w", stdout);
-    freopen("/dev/null", "w", stderr);
-}
 

@@ -124,7 +124,7 @@ This avoids scanning thousands of directories needlessly and reflects realistic 
   - The short lifespan of many processes and sockets.
 - **No async I/O needed**: Since the system supports only a single client at a time, `select()` or `poll()` mechanisms were deemed unnecessary.
 - **Accuracy edge cases**: While the daemon does scan and clean its map, short-lived connections or timing mismatches can still lead to missing or incorrect PID resolutions.
-- **Deliberately limited reuse**: Almost no code reuse across the project was enforced, as this system was structured primarily as an educational exercise in implementing each component independently.
+
 
 ---
 
